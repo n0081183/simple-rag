@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gold-set evaluation — precision/recall on extraction + verification accuracy."""
+"""Gold-set evaluation — verdict accuracy with seed KB."""
 
 import json
 import os
@@ -11,8 +11,11 @@ os.environ.setdefault("SIWZ_SKIP_ML", "1")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
+from app.config import get_settings
+from app.core.extraction.schemas import ExtractedRequirement
+from app.core.kb.ingest import build_seed_kb
 from app.core.extraction.pipeline import ExtractionPipeline
-from app.core.verification.schemas import Verdict
+from app.core.extraction.presplit import pre_split_blocks
 from app.core.verification.verifier import VerificationOrchestrator
 
 
@@ -21,30 +24,37 @@ def main() -> int:
     data = json.loads(gold_path.read_text(encoding="utf-8"))
     cases = data.get("cases", [])
 
+    settings = get_settings()
+    build_seed_kb(settings.kb_active_path, skip_ml=True)
+
+    # Extraction smoke: single combined doc
+    sample_doc = "\n\n".join(c["requirement"] for c in cases[:5])
+    blocks = pre_split_blocks(sample_doc)
+    pipeline = ExtractionPipeline(language="pl", use_llm=False)
+    ext = pipeline.run(sample_doc)
+    extraction_recall = min(1.0, len(ext.requirements) / max(len(blocks), 1))
+
     correct = 0
     total = len(cases)
     report_dir = Path(__file__).parent / "reports"
     report_dir.mkdir(exist_ok=True)
+    details = []
 
-    results_log = []
     for case in cases:
-        req_text = case["requirement"]
-        product = case["product"]
-        expected = case["expected_verdict"]
-
-        from app.core.extraction.schemas import ExtractedRequirement
-
-        req = ExtractedRequirement(title=req_text[:40], text=req_text)
-        orch = VerificationOrchestrator(product=product, language=case.get("language", "pl"))
+        req = ExtractedRequirement(title=case["id"], text=case["requirement"])
+        orch = VerificationOrchestrator(product=case["product"], language=case.get("language", "pl"))
         result = orch.verify_one(req)
+        expected = case["expected_verdict"]
         match = result.verdict.value == expected
         if match:
             correct += 1
-        results_log.append(
+        details.append(
             {
                 "id": case["id"],
                 "expected": expected,
                 "actual": result.verdict.value,
+                "confidence": result.confidence.value,
+                "evidence_count": len(result.evidence),
                 "match": match,
             }
         )
@@ -54,13 +64,17 @@ def main() -> int:
         "total": total,
         "correct": correct,
         "accuracy": accuracy,
-        "details": results_log,
+        "extraction_blocks": len(blocks),
+        "extraction_requirements": len(ext.requirements),
+        "extraction_recall_proxy": extraction_recall,
+        "details": details,
     }
     out = report_dir / "latest.json"
     out.write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    print(f"Eval: {correct}/{total} accuracy={accuracy:.2%}")
+    print(f"Verdict accuracy: {correct}/{total} ({accuracy:.1%})")
+    print(f"Extraction proxy recall: {extraction_recall:.1%} ({len(ext.requirements)} reqs / {len(blocks)} blocks)")
     print(f"Report: {out}")
-    return 0 if accuracy >= 0.0 else 1  # M0: always pass structure; M1: threshold
+    return 0
 
 
 if __name__ == "__main__":

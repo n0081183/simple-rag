@@ -1,23 +1,44 @@
-"""Extraction pipeline orchestration: parse → pre-split → validate."""
+"""Extraction pipeline: pre-split → parallel LLM validation."""
 
 from __future__ import annotations
 
+import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from app.config import get_settings
 from app.core.extraction.presplit import pre_split_blocks
 from app.core.extraction.validator import BlockValidator
-from app.core.extraction.schemas import ExtractionJobResult
+from app.core.extraction.schemas import ExtractionJobResult, ExtractedRequirement
 from app.core.retrieval.product_match import suggest_product
+
+logger = logging.getLogger(__name__)
 
 
 class ExtractionPipeline:
-    def __init__(self, language: str = "pl", use_llm: bool = False):
+    def __init__(self, language: str = "pl", use_llm: bool = True, max_workers: int = 4):
         self.language = language
         self.validator = BlockValidator(language=language, use_llm=use_llm)
+        settings = get_settings()
+        self.max_workers = max_workers if use_llm else 1
 
     def run(self, text: str, auto_detect: bool = False) -> ExtractionJobResult:
         blocks = pre_split_blocks(text)
-        requirements = []
-        for idx, block in enumerate(blocks):
-            requirements.extend(self.validator.validate(block, idx))
+        requirements: list[ExtractedRequirement] = []
+
+        if len(blocks) <= 1 or self.max_workers == 1:
+            for idx, block in enumerate(blocks):
+                requirements.extend(self.validator.validate(block, idx))
+        else:
+            with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
+                futures = {
+                    pool.submit(self.validator.validate, block, idx): idx
+                    for idx, block in enumerate(blocks)
+                }
+                for fut in as_completed(futures):
+                    try:
+                        requirements.extend(fut.result())
+                    except Exception as e:
+                        logger.warning("block_validate_failed error=%s", e)
 
         product_suggestion = None
         auto_warning = False
@@ -30,4 +51,5 @@ class ExtractionPipeline:
             blocks_processed=len(blocks),
             product_suggestion=product_suggestion,
             auto_detect_warning=auto_warning,
+            status="completed",
         )

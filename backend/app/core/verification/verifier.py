@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
-from app.config import get_settings
+import logging
+
+from pydantic import ValidationError
+
 from app.core.extraction.schemas import ExtractedRequirement
+from app.core.llm import get_llm_provider
 from app.core.retrieval.retriever import Retriever, build_context
 from app.core.verification.prompts import build_verify_system_prompt, build_verify_user_prompt
 from app.core.verification.schemas import (
@@ -12,8 +16,8 @@ from app.core.verification.schemas import (
     VerificationResult,
     Verdict,
 )
-from app.core.verification.llm_local import OllamaProvider
-from app.core.verification.llm_api import AnthropicProvider
+
+logger = logging.getLogger(__name__)
 
 
 class VerificationOrchestrator:
@@ -22,14 +26,7 @@ class VerificationOrchestrator:
         self.language = language
         self.anonymize = anonymize
         self.retriever = Retriever()
-        settings = get_settings()
-        if settings.llm_provider == "anthropic":
-            try:
-                self.llm = AnthropicProvider()
-            except ValueError:
-                self.llm = OllamaProvider()
-        else:
-            self.llm = OllamaProvider()
+        self.llm = get_llm_provider()
 
     def verify_one(self, req: ExtractedRequirement) -> VerificationResult:
         chunks = self.retriever.retrieve(req.text, product_filter=self.product)
@@ -37,46 +34,85 @@ class VerificationOrchestrator:
         system = build_verify_system_prompt(self.product, self.language)
         user = build_verify_user_prompt(req.text, context, self.language)
 
-        data = self.llm.complete_json(system, user)
-        if data:
-            try:
-                result = VerificationResult(
-                    requirement_id=req.id,
-                    requirement_text=req.text,
-                    **{k: v for k, v in data.items() if k not in ("requirement_id", "requirement_text")},
-                )
-                if not result.evidence and result.verdict != Verdict.UNCLEAR:
-                    result.verdict = Verdict.UNCLEAR
-                    result.confidence = Confidence.LOW
-                return result
-            except Exception:
-                pass
+        raw = self.llm.complete_json(system, user, VerificationResult)
+        try:
+            result = VerificationResult(
+                requirement_id=req.id,
+                requirement_text=req.text,
+                **{
+                    k: v
+                    for k, v in raw.items()
+                    if k not in ("requirement_id", "requirement_text") and v is not None
+                },
+            )
+        except (ValidationError, TypeError) as e:
+            logger.warning("verify_parse_failed id=%s error=%s", req.id, e)
+            return self._fallback_verify(req, chunks, no_evidence_policy=True)
 
-        return self._mock_verify(req, chunks)
+        if not result.evidence:
+            if result.verdict in (Verdict.MET, Verdict.PARTIAL, Verdict.NOT_MET):
+                result.verdict = Verdict.UNCLEAR
+                result.confidence = Confidence.LOW
+                result.caveats = (result.caveats or "") + " Brak cytatu w kontekście."
+            elif chunks:
+                result.evidence = [
+                    EvidenceItem(
+                        source_file=c.source_file,
+                        topic_url=c.topic_url,
+                        quote=c.text[:400],
+                        relevance="medium",
+                    )
+                    for c in chunks[:3]
+                ]
+
+        if self.anonymize:
+            result = self._anonymize(result)
+
+        return result
 
     def verify_all(self, requirements: list[ExtractedRequirement]) -> list[VerificationResult]:
         return [self.verify_one(r) for r in requirements if r.enabled]
 
-    def _mock_verify(self, req: ExtractedRequirement, chunks) -> VerificationResult:
+    def _fallback_verify(self, req, chunks, no_evidence_policy: bool = False) -> VerificationResult:
         evidence = [
             EvidenceItem(
                 source_file=c.source_file,
                 topic_url=c.topic_url,
-                quote=c.text[:300],
+                quote=c.text[:400],
                 relevance="medium",
             )
-            for c in chunks[:2]
+            for c in chunks[:3]
         ]
-        verdict = Verdict.UNCLEAR if not evidence else Verdict.PARTIAL
+        if no_evidence_policy and not evidence:
+            verdict = Verdict.UNCLEAR
+        elif evidence:
+            verdict = Verdict.PARTIAL
+        else:
+            verdict = Verdict.UNCLEAR
+
         return VerificationResult(
             requirement_id=req.id,
             requirement_text=req.text,
             verdict=verdict,
             reasoning_steps=[
-                "Mock: Ollama unavailable or KB empty.",
-                "Configure Ollama and build knowledge base.",
+                "LLM structured output unavailable — used retrieval context only.",
+                "Configure Ollama or Anthropic API for full chain-of-thought verification.",
             ],
             evidence=evidence,
-            confidence=Confidence.LOW,
-            caveats="Milestone 0 mock response",
+            confidence=Confidence.LOW if verdict == Verdict.UNCLEAR else Confidence.MEDIUM,
+            caveats="Fallback verification path",
         )
+
+    def _anonymize(self, result: VerificationResult) -> VerificationResult:
+        replacements = [
+            ("Cortex XDR", "rozwiązanie"),
+            ("Cortex XSIAM", "rozwiązanie"),
+            ("Cortex XSOAR", "rozwiązanie"),
+            ("Cortex XPANSE", "rozwiązanie"),
+            ("Palo Alto", "dostawca"),
+        ]
+        text = result.requirement_text
+        for old, new in replacements:
+            text = text.replace(old, new)
+        result.requirement_text = text
+        return result

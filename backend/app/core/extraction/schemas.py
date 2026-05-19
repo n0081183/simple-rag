@@ -25,11 +25,12 @@ class RequirementPriority(str, Enum):
 
 
 class BlockValidationResult(BaseModel):
-    """LLM validator output per pre-split block."""
-
     is_requirement: bool
     reason_if_not: str | None = None
     split_into: list[str] = Field(default_factory=list)
+    title: str | None = None
+    category: RequirementCategory = RequirementCategory.other
+    priority: RequirementPriority = RequirementPriority.unknown
 
 
 class ExtractedRequirement(BaseModel):
@@ -47,3 +48,5 @@ class ExtractionJobResult(BaseModel):
     blocks_processed: int = 0
     product_suggestion: str | None = None
     auto_detect_warning: bool = False
+    status: str = "completed"
+    error: str | None = None
