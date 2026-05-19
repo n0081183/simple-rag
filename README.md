@@ -46,6 +46,7 @@ flowchart LR
 | `make eval` | Gold set 20 wymagań |
 | `make sync-kb` | Sync bazy (CLI) |
 | `make preflight` | Sprawdzenie Ollama / LanceDB |
+| `make seed-kb` | Budowa seedowej bazy wiedzy (dev) |
 
 ## Bezpieczeństwo
 

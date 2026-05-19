@@ -36,7 +36,7 @@ class VerificationResult(BaseModel):
     requirement_id: str
     requirement_text: str
     verdict: Verdict
-    reasoning_steps: list[str] = Field(min_length=1, max_length=8)
+    reasoning_steps: list[str] = Field(default_factory=list, max_length=8)
     evidence: list[EvidenceItem] = Field(default_factory=list)
     confidence: Confidence
     caveats: str | None = None

@@ -51,6 +51,9 @@ test: ## pytest + vitest
 preflight: ## Check environment (Ollama, KB path, GPU optional)
 	$(UV) run python scripts/preflight.py
 
+seed-kb: ## Build seed knowledge base (local dev)
+	$(UV) run python scripts/ingest_seed_kb.py
+
 clean:
 	rm -rf $(FRONTEND)/.next $(FRONTEND)/out $(FRONTEND)/node_modules/.cache
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

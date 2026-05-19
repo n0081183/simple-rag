@@ -4,21 +4,23 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
+from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
-from sse_starlette.sse import EventSourceResponse
 
+from app.core.extraction.parser import parse_upload_bytes
 from app.core.extraction.pipeline import ExtractionPipeline
 from app.core.extraction.schemas import ExtractedRequirement, ExtractionJobResult
+from app.core.reporting.markdown import export_markdown
 from app.core.verification.schemas import VerificationResult
 from app.core.verification.verifier import VerificationOrchestrator
 
 router = APIRouter(prefix="/requirements", tags=["requirements"])
 
-# In-memory job store (Milestone 1: Redis or SQLite)
-_jobs: dict[str, ExtractionJobResult] = {}
-_verify_jobs: dict[str, list[VerificationResult]] = {}
+_jobs: dict[str, dict[str, Any]] = {}
+_verify_jobs: dict[str, dict[str, Any]] = {}
 
 
 class Language(str, Enum):
@@ -31,6 +33,7 @@ class ExtractRequest(BaseModel):
     language: Language = Language.pl
     product: str | None = None
     auto_detect_product: bool = False
+    use_llm: bool = True
 
 
 class ExtractResponse(BaseModel):
@@ -40,9 +43,16 @@ class ExtractResponse(BaseModel):
 
 class RequirementsListResponse(BaseModel):
     job_id: str
-    requirements: list[ExtractedRequirement]
+    status: str
+    requirements: list[ExtractedRequirement] = Field(default_factory=list)
     product_suggestion: str | None = None
     auto_detect_warning: bool = False
+    blocks_processed: int = 0
+    error: str | None = None
+
+
+class RequirementsUpdateRequest(BaseModel):
+    requirements: list[ExtractedRequirement]
 
 
 class VerifyRequest(BaseModel):
@@ -53,71 +63,169 @@ class VerifyRequest(BaseModel):
     anonymize: bool = False
 
 
-@router.post("/extract", response_model=ExtractResponse)
-async def start_extraction(body: ExtractRequest, background_tasks: BackgroundTasks):
-    if not body.text or not body.text.strip():
-        raise HTTPException(400, "No text provided for extraction")
-    job_id = str(uuid.uuid4())
-    pipeline = ExtractionPipeline(language=body.language.value)
-
-    def run():
-        result = pipeline.run(text=body.text or "")
-        _jobs[job_id] = result
-
-    background_tasks.add_task(run)
-    return ExtractResponse(job_id=job_id, status="processing")
+class VerifyStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: int = 0
+    total: int = 0
+    results: list[VerificationResult] = Field(default_factory=list)
+    error: str | None = None
 
 
-@router.get("/extract/{job_id}", response_model=RequirementsListResponse)
-def get_extraction(job_id: str):
-    result = _jobs.get(job_id)
-    if not result:
-        raise HTTPException(404, "Job not found")
-    return RequirementsListResponse(
-        job_id=job_id,
-        requirements=result.requirements,
-        product_suggestion=result.product_suggestion,
-        auto_detect_warning=result.auto_detect_warning,
-    )
+def _run_extraction(job_id: str, text: str, language: str, auto_detect: bool, use_llm: bool):
+    _jobs[job_id]["status"] = "processing"
+    try:
+        pipeline = ExtractionPipeline(language=language, use_llm=use_llm)
+        result = pipeline.run(text=text, auto_detect=auto_detect)
+        _jobs[job_id].update(result.model_dump())
+        _jobs[job_id]["status"] = "completed"
+    except Exception as e:
+        _jobs[job_id]["status"] = "failed"
+        _jobs[job_id]["error"] = str(e)
 
 
-@router.post("/verify", response_model=ExtractResponse)
-async def start_verification(body: VerifyRequest, background_tasks: BackgroundTasks):
-    extraction = _jobs.get(body.job_id)
-    if not extraction:
-        raise HTTPException(404, "Extraction job not found")
-    reqs = extraction.requirements
-    if body.requirement_ids:
-        ids = set(body.requirement_ids)
-        reqs = [r for r in reqs if r.id in ids]
-    job_id = str(uuid.uuid4())
-
-    def run():
+def _run_verification(job_id: str, reqs: list[ExtractedRequirement], body: VerifyRequest):
+    _verify_jobs[job_id]["status"] = "processing"
+    _verify_jobs[job_id]["total"] = len(reqs)
+    try:
         orchestrator = VerificationOrchestrator(
             product=body.product,
             language=body.language.value,
             anonymize=body.anonymize,
         )
-        results = orchestrator.verify_all(reqs)
-        _verify_jobs[job_id] = results
+        results: list[VerificationResult] = []
+        for i, req in enumerate(reqs):
+            results.append(orchestrator.verify_one(req))
+            _verify_jobs[job_id]["progress"] = i + 1
+            _verify_jobs[job_id]["results"] = results
+        _verify_jobs[job_id]["status"] = "completed"
+    except Exception as e:
+        _verify_jobs[job_id]["status"] = "failed"
+        _verify_jobs[job_id]["error"] = str(e)
 
-    background_tasks.add_task(run)
-    return ExtractResponse(job_id=job_id, status="processing")
+
+@router.post("/extract", response_model=ExtractResponse)
+async def start_extraction(body: ExtractRequest, background_tasks: BackgroundTasks):
+    if not body.text or not body.text.strip():
+        raise HTTPException(400, "No text provided for extraction")
+    job_id = str(uuid.uuid4())
+    _jobs[job_id] = {"status": "queued", "requirements": []}
+    background_tasks.add_task(
+        _run_extraction,
+        job_id,
+        body.text,
+        body.language.value,
+        body.auto_detect_product,
+        body.use_llm,
+    )
+    return ExtractResponse(job_id=job_id, status="queued")
 
 
-@router.get("/verify/{job_id}")
-def get_verification(job_id: str):
-    results = _verify_jobs.get(job_id)
-    if results is None:
+@router.post("/extract/upload", response_model=ExtractResponse)
+async def extract_upload(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    language: Language = Language.pl,
+    auto_detect_product: bool = Form(False),
+    pasted_text: str | None = Form(None),
+    use_llm: bool = Form(True),
+):
+    data = await file.read()
+    text = parse_upload_bytes(data, file.filename or "upload.pdf")
+    if pasted_text and pasted_text.strip():
+        text = f"{text}\n\n{pasted_text.strip()}"
+    job_id = str(uuid.uuid4())
+    _jobs[job_id] = {"status": "queued", "requirements": []}
+    background_tasks.add_task(
+        _run_extraction,
+        job_id,
+        text,
+        language.value,
+        auto_detect_product,
+        use_llm,
+    )
+    return ExtractResponse(job_id=job_id, status="queued")
+
+
+@router.get("/extract/{job_id}", response_model=RequirementsListResponse)
+def get_extraction(job_id: str):
+    job = _jobs.get(job_id)
+    if not job:
         raise HTTPException(404, "Job not found")
-    return {"job_id": job_id, "results": [r.model_dump() for r in results]}
+    return RequirementsListResponse(
+        job_id=job_id,
+        status=job.get("status", "unknown"),
+        requirements=job.get("requirements", []),
+        product_suggestion=job.get("product_suggestion"),
+        auto_detect_warning=job.get("auto_detect_warning", False),
+        blocks_processed=job.get("blocks_processed", 0),
+        error=job.get("error"),
+    )
 
 
-@router.get("/verify/{job_id}/stream")
-async def stream_verification(job_id: str):
-    """SSE stream placeholder for per-requirement progress (Milestone 1)."""
+@router.put("/extract/{job_id}/requirements")
+def update_requirements(job_id: str, body: RequirementsUpdateRequest):
+    job = _jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    job["requirements"] = [r.model_dump() for r in body.requirements]
+    return {"ok": True, "count": len(body.requirements)}
 
-    async def events():
-        yield {"event": "status", "data": '{"phase":"pending"}'}
 
-    return EventSourceResponse(events())
+@router.post("/verify", response_model=ExtractResponse)
+async def start_verification(body: VerifyRequest, background_tasks: BackgroundTasks):
+    job = _jobs.get(body.job_id)
+    if not job:
+        raise HTTPException(404, "Extraction job not found")
+    raw_reqs = job.get("requirements", [])
+    reqs = [ExtractedRequirement.model_validate(r) for r in raw_reqs]
+    if body.requirement_ids:
+        ids = set(body.requirement_ids)
+        reqs = [r for r in reqs if r.id in ids]
+    if not reqs:
+        raise HTTPException(400, "No requirements to verify")
+    job_id = str(uuid.uuid4())
+    _verify_jobs[job_id] = {"status": "queued", "results": [], "progress": 0, "total": len(reqs)}
+    background_tasks.add_task(_run_verification, job_id, reqs, body)
+    return ExtractResponse(job_id=job_id, status="queued")
+
+
+@router.get("/verify/{job_id}", response_model=VerifyStatusResponse)
+def get_verification(job_id: str):
+    job = _verify_jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    results = job.get("results", [])
+    parsed = [
+        r if isinstance(r, VerificationResult) else VerificationResult.model_validate(r)
+        for r in results
+    ]
+    return VerifyStatusResponse(
+        job_id=job_id,
+        status=job.get("status", "unknown"),
+        progress=job.get("progress", 0),
+        total=job.get("total", 0),
+        results=parsed,
+        error=job.get("error"),
+    )
+
+
+@router.get("/verify/{job_id}/report.md")
+def export_report_md(
+    job_id: str,
+    language: Language = Language.pl,
+    auto_detect_warning: bool = False,
+):
+    job = _verify_jobs.get(job_id)
+    if not job or job.get("status") != "completed":
+        raise HTTPException(404, "Completed verification job not found")
+    results = [
+        VerificationResult.model_validate(r) for r in job.get("results", [])
+    ]
+    md = export_markdown(
+        results,
+        title="SIWZ Verification Report",
+        language=language.value,
+        auto_detect_warning=auto_detect_warning,
+    )
+    return PlainTextResponse(md, media_type="text/markdown")

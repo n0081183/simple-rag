@@ -1,41 +1,26 @@
 {
   "version": "1",
-  "description": "20 requirements gold set — 5 per product area (Milestone 1 expansion)",
+  "description": "20 requirements — 5 per product cluster for eval",
   "cases": [
-    {
-      "id": "xdr-01",
-      "product": "xdr",
-      "requirement": "Dostawca musi zapewnić agenta EDR na systemy Windows 10 i Windows 11.",
-      "expected_verdict": "MET",
-      "language": "pl"
-    },
-    {
-      "id": "xdr-02",
-      "product": "xdr",
-      "requirement": "System musi wspierać macOS 12 i nowsze wersje.",
-      "expected_verdict": "MET",
-      "language": "pl"
-    },
-    {
-      "id": "xsiam-01",
-      "product": "xsiam",
-      "requirement": "Platforma SIEM musi działać w modelu SaaS z opcjonalnym węzłem Broker VM.",
-      "expected_verdict": "MET",
-      "language": "pl"
-    },
-    {
-      "id": "xsoar-01",
-      "product": "xsoar",
-      "requirement": "Rozwiązanie SOAR musi umożliwiać tworzenie i uruchamianie playbooków.",
-      "expected_verdict": "MET",
-      "language": "pl"
-    },
-    {
-      "id": "xpanse-01",
-      "product": "xpanse",
-      "requirement": "System musi skanować zewnętrzną powierzchnię ataku organizacji.",
-      "expected_verdict": "MET",
-      "language": "pl"
-    }
+    {"id": "xdr-01", "product": "xdr", "requirement": "Dostawca musi zapewnić agenta EDR na systemy Windows 10 i Windows 11.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xdr-02", "product": "xdr", "requirement": "System musi wspierać macOS 12 i nowsze wersje.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xdr-03", "product": "xdr", "requirement": "Rozwiązanie musi integrować się z Palo Alto NGFW i Panorama.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xdr-04", "product": "xdr", "requirement": "Agent musi zapewniać ochronę przed ransomware i exploitami.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xdr-05", "product": "xdr", "requirement": "Dostawca musi wspierać system z/OS 1.13 mainframe.", "expected_verdict": "NOT_MET", "language": "pl"},
+    {"id": "xsiam-01", "product": "xsiam", "requirement": "Platforma SIEM musi działać w modelu SaaS z opcjonalnym węzłem Broker VM.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xsiam-02", "product": "xsiam", "requirement": "System musi zapewniać korelację zdarzeń i wbudowany SOAR.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xsiam-03", "product": "xsiam", "requirement": "Rozwiązanie musi wykorzystywać Cortex Data Lake.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xsiam-04", "product": "xsiam", "requirement": "Platforma musi oferować Copilot do analizy zagrożeń.", "expected_verdict": "PARTIAL", "language": "pl"},
+    {"id": "xsiam-05", "product": "xsiam", "requirement": "System musi działać wyłącznie on-prem bez połączenia z chmurą.", "expected_verdict": "NOT_MET", "language": "pl"},
+    {"id": "xsoar-01", "product": "xsoar", "requirement": "Rozwiązanie SOAR musi umożliwiać tworzenie i uruchamianie playbooków.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xsoar-02", "product": "xsoar", "requirement": "System musi oferować case management i War Room.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xsoar-03", "product": "xsoar", "requirement": "Platforma musi posiadać co najmniej 500 integracji content packs.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xsoar-04", "product": "xsoar", "requirement": "SOAR musi być wbudowany w XSIAM bez osobnej instalacji.", "expected_verdict": "PARTIAL", "language": "pl"},
+    {"id": "xsoar-05", "product": "xsoar", "requirement": "System musi zastąpić w całości firewall NGFW.", "expected_verdict": "NOT_MET", "language": "pl"},
+    {"id": "xpanse-01", "product": "xpanse", "requirement": "System musi skanować zewnętrzną powierzchnię ataku organizacji.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xpanse-02", "product": "xpanse", "requirement": "Rozwiązanie musi wykrywać publiczne adresy IP i certyfikaty.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "xpanse-03", "product": "xpanse", "requirement": "Platforma musi testować podatności i błędy konfiguracji.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "cloud-01", "product": "cortex_cloud", "requirement": "Rozwiązanie musi zapewniać CSPM i CWPP dla chmury publicznej.", "expected_verdict": "MET", "language": "pl"},
+    {"id": "agentix-01", "product": "agentix", "requirement": "System musi udostępniać agentów AI do automatyzacji analiz SecOps.", "expected_verdict": "MET", "language": "pl"}
   ]
 }
