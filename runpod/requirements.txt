@@ -1,0 +1,8 @@
+sentence-transformers>=3.0.0
+FlagEmbedding>=1.2.10
+lancedb>=0.17.0
+pyarrow>=18.0.0
+selectolax>=0.3.27
+tqdm>=4.66.0
+requests>=2.31.0
+cortex-docs-sync @ git+https://github.com/n0081183/cortex-docs-sync-v3.git

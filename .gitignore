@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+.env
+!.env.example
+uv.lock
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Knowledge base (local, never commit)
+.kb-staging/
+kb-staging/
+kb-active/
+kb-previous/
+~/.siwz-rag-lite/
+
+# Eval reports
+eval/reports/
+
+# Logs
+logs/
+*.log
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Tauri (future)
+src-tauri/target/
+
+# Snapshots / large artifacts
+*.tar.zst
+snapshots/
+
+# Cortex docs mirror (downloaded locally)
+cortex_docs/
+
+# Secrets audit
+*.pem
+*.key
+!*.key.example

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "cursor/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Sync dependencies
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv sync --extra dev
+
+      - name: Ruff
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv run ruff check backend eval scripts
+
+      - name: Pytest
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv run pytest backend/tests -q
+
+      - name: Eval structure
+        env:
+          SIWZ_SKIP_ML: "1"
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv run python eval/run_eval.py
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install and lint
+        run: |
+          npm ci
+          npm run lint
+          npm run build
