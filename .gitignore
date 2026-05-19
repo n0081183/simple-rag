@@ -8,7 +8,6 @@ __pycache__/
 venv/
 .env
 !.env.example
-uv.lock
 dist/
 build/
 *.egg-info/
