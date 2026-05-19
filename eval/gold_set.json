@@ -1,0 +1,41 @@
+{
+  "version": "1",
+  "description": "20 requirements gold set — 5 per product area (Milestone 1 expansion)",
+  "cases": [
+    {
+      "id": "xdr-01",
+      "product": "xdr",
+      "requirement": "Dostawca musi zapewnić agenta EDR na systemy Windows 10 i Windows 11.",
+      "expected_verdict": "MET",
+      "language": "pl"
+    },
+    {
+      "id": "xdr-02",
+      "product": "xdr",
+      "requirement": "System musi wspierać macOS 12 i nowsze wersje.",
+      "expected_verdict": "MET",
+      "language": "pl"
+    },
+    {
+      "id": "xsiam-01",
+      "product": "xsiam",
+      "requirement": "Platforma SIEM musi działać w modelu SaaS z opcjonalnym węzłem Broker VM.",
+      "expected_verdict": "MET",
+      "language": "pl"
+    },
+    {
+      "id": "xsoar-01",
+      "product": "xsoar",
+      "requirement": "Rozwiązanie SOAR musi umożliwiać tworzenie i uruchamianie playbooków.",
+      "expected_verdict": "MET",
+      "language": "pl"
+    },
+    {
+      "id": "xpanse-01",
+      "product": "xpanse",
+      "requirement": "System musi skanować zewnętrzną powierzchnię ataku organizacji.",
+      "expected_verdict": "MET",
+      "language": "pl"
+    }
+  ]
+}

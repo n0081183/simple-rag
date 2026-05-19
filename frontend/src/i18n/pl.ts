@@ -1,0 +1,63 @@
+import type { TranslationKeys } from "./en";
+
+export const pl: TranslationKeys = {
+  app: {
+    name: "SIWZ-RAG Lite",
+    tagline: "Weryfikacja wymagań Cortex",
+  },
+  nav: {
+    verify: "Weryfikacja wymagań",
+    kb: "Baza wiedzy",
+    settings: "Ustawienia",
+  },
+  verify: {
+    title: "Weryfikacja wymagań",
+    subtitle:
+      "Wgraj SIWZ/SWZ lub wklej wymagania, przejrzyj listę i zweryfikuj względem dokumentacji Cortex.",
+    upload: "Wgraj PDF lub DOCX",
+    paste: "Wklej wymagania",
+    pastePlaceholder: "Wklej treść wymagań lub uzupełnienie do dokumentu…",
+    product: "Produkt Cortex",
+    autoDetect: "Automatyczne dopasowanie produktu",
+    autoDetectWarning:
+      "Automatyczne dopasowanie produktu — wymaga weryfikacji przez specjalistę Cortex przed oddaniem raportu.",
+    extract: "Wyodrębnij wymagania",
+    review: "Przegląd wymagań",
+    runVerification: "Uruchom weryfikację",
+    emptyTitle: "Brak wymagań",
+    emptyDescription: "Wgraj dokument lub wklej tekst, aby rozpocząć ekstrakcję.",
+  },
+  kb: {
+    title: "Budowa / aktualizacja bazy wiedzy",
+    subtitle: "Synchronizuj dokumentację Cortex na zdalnym podzie GPU i pobierz indeks.",
+    stepCredentials: "Dane RunPod",
+    stepScope: "Zakres synchronizacji",
+    stepProgress: "Postęp",
+    apiKey: "Klucz API RunPod",
+    podId: "ID poda / host SSH",
+    testConnection: "Test połączenia",
+    start: "Rozpocznij synchronizację",
+    incremental: "Przyrostowa (pomiń bez zmian)",
+    fullRebuild: "Pełna przebudowa",
+    releaseNotes: "Release notes (niezalecane)",
+    noKb: "Baza wiedzy nie została załadowana",
+    noKbHint: "Uruchom synchronizację, aby włączyć weryfikację względem dokumentacji.",
+  },
+  settings: {
+    title: "Ustawienia",
+    language: "Język interfejsu",
+    theme: "Motyw",
+    themeLight: "Jasny",
+    themeDark: "Ciemny",
+    themeSystem: "Systemowy",
+    llm: "Jakość LLM",
+    llmLocal: "Lokalny (Ollama, offline)",
+    llmCloud: "API chmurowe (premium)",
+  },
+  common: {
+    loading: "Ładowanie…",
+    error: "Wystąpił błąd",
+    save: "Zapisz",
+    cancel: "Anuluj",
+  },
+};
