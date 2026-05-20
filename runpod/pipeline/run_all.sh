@@ -22,12 +22,12 @@ SYNC_ARGS=(--output-dir "$INPUT_DIR" --rate-limit "$RATE_LIMIT")
 if [[ "$INCREMENTAL" != "1" ]]; then
   SYNC_ARGS+=(--full)
 fi
-for p in $PRODUCTS; do
-  SYNC_ARGS+=(--product "$p")
-done
 if [[ "$INCLUDE_RN" == "1" ]]; then
   SYNC_ARGS+=(--include-release-notes)
 fi
+# Pass all products in one flag (avoids argparse swallowing only the last --product)
+# shellcheck disable=SC2206
+SYNC_ARGS+=(--products $PRODUCTS)
 
 python runpod/pipeline/sync_docs.py "${SYNC_ARGS[@]}"
 
