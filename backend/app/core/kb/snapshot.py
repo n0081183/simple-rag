@@ -82,9 +82,35 @@ def extract_tar_zst(archive: Path, dest: Path) -> None:
 
 
 def install_snapshot(archive: Path, staging_path: Path) -> dict:
-    if staging_path.exists():
-        shutil.rmtree(staging_path)
-    staging_path.mkdir(parents=True)
-    extract_tar_zst(archive, staging_path)
-    manifest = validate_staging(staging_path)
+    """Extract snapshot into staging. Archive may live inside staging_path (download path)."""
+    archive = archive.resolve()
+    staging_path = staging_path.resolve()
+    if not archive.is_file():
+        raise FileNotFoundError(f"Snapshot archive missing: {archive}")
+
+    # Legacy path: archive downloaded into kb-staging/ — move aside before we replace staging
+    try:
+        archive.relative_to(staging_path)
+    except ValueError:
+        pass
+    else:
+        safe = staging_path.parent / archive.name
+        if archive != safe:
+            shutil.copy2(archive, safe)
+            archive = safe
+
+    extract_tmp = staging_path.parent / f"{staging_path.name}.extract-tmp"
+    if extract_tmp.exists():
+        shutil.rmtree(extract_tmp)
+    extract_tmp.mkdir(parents=True)
+    try:
+        extract_tar_zst(archive, extract_tmp)
+        validate_staging(extract_tmp)
+        if staging_path.exists():
+            shutil.rmtree(staging_path)
+        extract_tmp.rename(staging_path)
+    except Exception:
+        shutil.rmtree(extract_tmp, ignore_errors=True)
+        raise
+
     return json.loads((staging_path / "manifest.json").read_text(encoding="utf-8"))

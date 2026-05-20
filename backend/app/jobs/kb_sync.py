@@ -76,8 +76,10 @@ def run_kb_sync_job(job_id: str, request: SyncStartRequest, jobs: dict) -> None:
         log("Downloading snapshot from pod…")
         settings = get_settings()
         staging = settings.kb_staging_path
-        archive = staging / "kb_snapshot.tar.zst"
+        # Keep archive next to staging (install_snapshot must not delete it during extract)
+        archive = settings.data_dir / "kb_snapshot.tar.zst"
         staging.mkdir(parents=True, exist_ok=True)
+        settings.data_dir.mkdir(parents=True, exist_ok=True)
 
         with SSHSession(ssh_cfg) as ssh:
 
@@ -86,7 +88,13 @@ def run_kb_sync_job(job_id: str, request: SyncStartRequest, jobs: dict) -> None:
                     job["download_pct"] = int(100 * done / total)
 
             ssh.download_file(REMOTE_SNAPSHOT, archive, on_progress=prog)
-        log(f"Downloaded {archive.stat().st_size / 1e6:.1f} MB")
+
+        if not archive.is_file():
+            raise RuntimeError(f"Snapshot not saved after download: {archive}")
+        size_mb = archive.stat().st_size / 1e6
+        if size_mb < 10:
+            raise RuntimeError(f"Snapshot too small ({size_mb:.1f} MB) — download likely incomplete")
+        log(f"Downloaded {size_mb:.1f} MB → {archive}")
         set_step("download_local", "done")
 
         set_step("atomic_swap", "running")
