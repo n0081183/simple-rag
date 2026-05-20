@@ -32,6 +32,9 @@ The portal returns **HTTP 429** when crawled too fast. SIWZ ships a patched `cor
 |---------|---------|--------------|
 | Request rate | **1.0 req/s per thread** (UI on KB page) | `rate_limit_rps`; effective ≈ rate × workers |
 | Topic download workers | **4** (default) | `topic_workers`; `CORTEX_SYNC_TOPIC_WORKERS` |
+| Embed batch / logs | **96** batch, progress every **2000** chunks | `EMBED_BATCH_SIZE`, `EMBED_LOG_EVERY`; logs show `device=cuda` |
+
+Embedding runs on **CUDA only** (`embed_gpu.py` aborts without GPU). SSH log UI filters tqdm `\r` bars; progress appears as `[embed] N/total (%)` lines.
 | Partial failures | **continue pipeline** | default; `CORTEX_SYNC_STRICT=1` to fail |
 
 Bootstrap always reinstalls the editable vendor package (even when `.bootstrap_ok` exists) so an old git install cannot shadow it.

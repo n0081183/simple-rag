@@ -38,10 +38,12 @@ python runpod/pipeline/chunk_html.py \
   --input-dir "$INPUT_DIR" \
   --output "${WORKSPACE}/chunks.jsonl"
 
+export TQDM_DISABLE=1
 python runpod/pipeline/embed_gpu.py \
   --input "${WORKSPACE}/chunks.jsonl" \
   --output "${WORKSPACE}/embeddings.jsonl" \
-  --batch-size "${EMBED_BATCH_SIZE:-64}"
+  --batch-size "${EMBED_BATCH_SIZE:-96}" \
+  --log-every "${EMBED_LOG_EVERY:-2000}"
 
 python runpod/pipeline/build_index.py \
   --input "${WORKSPACE}/embeddings.jsonl" \
