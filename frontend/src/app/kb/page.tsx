@@ -91,7 +91,11 @@ export default function KbPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Connection failed");
+      if (!res.ok) {
+        const detail = data.detail;
+        const msg = typeof detail === "string" ? detail : JSON.stringify(detail);
+        throw new Error(msg || "Connection failed");
+      }
       setGpuInfo(data.gpu || data.message || "OK");
     } catch (e) {
       setGpuInfo(`Error: ${e}`);

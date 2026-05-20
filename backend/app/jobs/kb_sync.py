@@ -38,7 +38,9 @@ def _repo_root() -> Path:
 
 
 def run_kb_sync_job(job_id: str, request: SyncStartRequest, jobs: dict) -> None:
-    job = jobs[job_id]
+    job = jobs.get(job_id)
+    if not isinstance(job, dict):
+        raise TypeError(f"Invalid sync job record for {job_id!r}")
     job["status"] = "running"
     job["steps"] = {s: "pending" for s in STEPS}
     job["logs"] = job.get("logs", [])
