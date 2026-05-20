@@ -24,6 +24,15 @@
 - Re-runs skip bootstrap if `/workspace/.bootstrap_ok` exists (`FORCE_BOOTSTRAP=1` to reinstall).
 - If pip fails, inspect `/workspace/bootstrap-pip.log` on the pod.
 
+### Product scope
+
+The UI sends all selected products as `--products xdr xsiam …` (single flag).  
+Do not use repeated `--product` abbreviations on `sync_docs.py` — argparse would keep only the last one.
+
+### Snapshot download (macOS)
+
+Local extract uses the Python `zstandard` package (no Homebrew `zstd` required). Install deps: `uv sync`.
+
 **Test connection**: `POST /api/kb/test-connection` — SSH + `nvidia-smi`, or dry-run seed build.
 
 ## Incremental mode
