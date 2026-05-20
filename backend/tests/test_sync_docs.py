@@ -10,6 +10,7 @@ def test_build_sync_cmd_all_products():
     args = argparse.Namespace(
         output_dir="/workspace/cortex_docs",
         rate_limit=2.0,
+        user_agent="test-ua",
         products=["xdr", "xsiam", "xsoar", "xpanse", "cortex_cloud", "agentix"],
         full=False,
         include_release_notes=False,
@@ -31,6 +32,7 @@ def test_build_sync_cmd_append_products_from_shell():
     args = argparse.Namespace(
         output_dir="/out",
         rate_limit=1.0,
+        user_agent="test-ua",
         products=["xdr", "xsiam", "xsoar", "xpanse", "cortex_cloud", "agentix"],
         full=True,
         include_release_notes=True,

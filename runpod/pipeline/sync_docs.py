@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 
@@ -16,6 +17,8 @@ def build_sync_cmd(args: argparse.Namespace) -> list[str]:
         args.output_dir,
         "--rate-limit",
         str(args.rate_limit),
+        "--user-agent",
+        args.user_agent,
     ]
     if args.products:
         cmd.extend(["--product", *args.products])
@@ -40,7 +43,20 @@ def main() -> None:
     )
     p.add_argument("--full", action="store_true", help="Full rebuild (not incremental)")
     p.add_argument("--include-release-notes", action="store_true")
-    p.add_argument("--rate-limit", type=float, default=2.0)
+    p.add_argument(
+        "--rate-limit",
+        type=float,
+        default=float(os.environ.get("RATE_LIMIT", "0.5")),
+        help="HTTP requests per second (default 0.5)",
+    )
+    p.add_argument(
+        "--user-agent",
+        default=os.environ.get(
+            "CORTEX_DOCS_USER_AGENT",
+            "Mozilla/5.0 (compatible; SIWZ-RAG-Lite/1.0) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        ),
+    )
     args = p.parse_args()
 
     cmd = build_sync_cmd(args)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -145,9 +146,12 @@ def _run_remote_pipeline(ssh: SSHSession, request: SyncStartRequest, log, set_st
     products = " ".join(request.products)
     incr = "1" if request.incremental else "0"
     rn = "1" if request.include_release_notes else "0"
+    rate_limit = os.environ.get("CORTEX_DOCS_RATE_LIMIT", "0.5")
+    topic_workers = os.environ.get("CORTEX_SYNC_TOPIC_WORKERS", "4")
     pipeline_cmd = (
         f"WORKSPACE={REMOTE_WORKSPACE} PRODUCTS='{products}' INCREMENTAL={incr} "
         f"INCLUDE_RELEASE_NOTES={rn} EMBED_BATCH_SIZE=64 "
+        f"RATE_LIMIT={rate_limit} CORTEX_SYNC_TOPIC_WORKERS={topic_workers} "
         f"bash {REMOTE_WORKSPACE}/runpod/pipeline/run_all.sh"
     )
     log("Starting full pipeline on pod (sync → chunk → embed → index → export)…")

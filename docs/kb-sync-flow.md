@@ -24,6 +24,17 @@
 - Re-runs skip bootstrap if `/workspace/.bootstrap_ok` exists (`FORCE_BOOTSTRAP=1` to reinstall).
 - If pip fails, inspect `/workspace/bootstrap-pip.log` on the pod.
 
+### Rate limiting (anti-bot / 429)
+
+The portal returns **HTTP 429** when crawled too fast. SIWZ ships a patched `cortex-docs-sync` in `runpod/cortex_docs_sync_vendor/`:
+
+| Setting | Default | Env override |
+|---------|---------|--------------|
+| Request rate | **0.5 req/s** | `RATE_LIMIT` |
+| Topic download workers | **4** | `CORTEX_SYNC_TOPIC_WORKERS` (set `1` for fully sequential) |
+
+After changing the vendor package, run sync with `FORCE_BOOTSTRAP=1` once on the pod or reinstall the editable package.
+
 ### Product scope
 
 The UI sends all selected products as `--products xdr xsiam …` (single flag).  
