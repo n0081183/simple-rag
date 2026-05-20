@@ -46,12 +46,21 @@ export default function VerifyPage() {
   const [showAutoDetectWarning, setShowAutoDetectWarning] = useState(false);
   const [phase, setPhase] = useState<"input" | "review" | "results">("input");
   const [loading, setLoading] = useState(false);
+  const [useLlmExtract, setUseLlmExtract] = useState(false);
+  const [extractHint, setExtractHint] = useState<string | null>(null);
   const [extractJobId, setExtractJobId] = useState<string | null>(null);
   const [verifyJobId, setVerifyJobId] = useState<string | null>(null);
   const [requirements, setRequirements] = useState<Req[]>([]);
   const [results, setResults] = useState<VerificationRow[]>([]);
   const [verifyProgress, setVerifyProgress] = useState({ done: 0, total: 0 });
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/settings/llm`)
+      .then((r) => r.json())
+      .then((d) => setUseLlmExtract(Boolean(d.extraction_use_llm)))
+      .catch(() => setUseLlmExtract(false));
+  }, []);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kb/products`)
@@ -69,6 +78,7 @@ export default function VerifyPage() {
   const handleExtract = useCallback(async () => {
     if (!text.trim() && !file) return;
     setLoading(true);
+    setExtractHint(null);
     setProductSuggestions([]);
     setShowAutoDetectWarning(false);
     try {
@@ -78,6 +88,7 @@ export default function VerifyPage() {
         fd.append("file", file);
         fd.append("language", locale);
         fd.append("auto_detect_product", String(autoDetect));
+        fd.append("use_llm", String(useLlmExtract));
         if (text.trim()) fd.append("pasted_text", text.trim());
         const res = await fetch(`${API_BASE}/api/requirements/extract/upload`, {
           method: "POST",
@@ -93,6 +104,7 @@ export default function VerifyPage() {
             text,
             language: locale,
             auto_detect_product: autoDetect,
+            use_llm: useLlmExtract,
           }),
         });
         const data = await res.json();
@@ -104,12 +116,18 @@ export default function VerifyPage() {
         (d) => d.status === "completed" || d.status === "failed"
       );
       if (final.status === "failed") throw new Error(final.error || "extraction failed");
-      setRequirements(
-        (final.requirements || []).map((r: Req) => ({
-          ...r,
-          enabled: r.enabled !== false,
-        }))
-      );
+      const reqs = (final.requirements || []).map((r: Req) => ({
+        ...r,
+        enabled: r.enabled !== false,
+      }));
+      if (!reqs.length) {
+        const hint =
+          final.error ||
+          `${t(locale, "verify.extractNoResults")} (${final.extraction_mode || "?"}, ${final.blocks_processed || 0} bloków)`;
+        setExtractHint(hint);
+        throw new Error(hint);
+      }
+      setRequirements(reqs);
       if (autoDetect && final.product_suggestions?.length) {
         setProductSuggestions(final.product_suggestions);
         setShowAutoDetectWarning(Boolean(final.auto_detect_warning));
@@ -118,7 +136,7 @@ export default function VerifyPage() {
     } finally {
       setLoading(false);
     }
-  }, [text, file, locale, autoDetect]);
+  }, [text, file, locale, autoDetect, useLlmExtract]);
 
   const applySuggestion = (suggested: string) => {
     setProduct(suggested);
@@ -250,6 +268,14 @@ export default function VerifyPage() {
               />
               {t(locale, "verify.autoDetect")}
             </label>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={useLlmExtract}
+                onChange={(e) => setUseLlmExtract(e.target.checked)}
+              />
+              {t(locale, "verify.extractUseLlm")}
+            </label>
             <button
               type="button"
               data-testid="verify-extract-btn"
@@ -263,6 +289,11 @@ export default function VerifyPage() {
               {loading ? t(locale, "common.loading") : t(locale, "verify.extract")}
             </button>
           </div>
+          {extractHint && (
+            <p className="text-sm text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+              {extractHint}
+            </p>
+          )}
         </>
       )}
 

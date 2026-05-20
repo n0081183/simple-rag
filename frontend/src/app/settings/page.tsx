@@ -10,6 +10,7 @@ type LlmProvider = "ollama" | "anthropic";
 export default function SettingsPage() {
   const { locale, setLocale } = useAppStore();
   const [provider, setProvider] = useState<LlmProvider>("ollama");
+  const [extractionUseLlm, setExtractionUseLlm] = useState(false);
   const [hasAnthropicKey, setHasAnthropicKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -21,6 +22,7 @@ export default function SettingsPage() {
       if (!res.ok) return;
       const data = await res.json();
       setProvider(data.provider === "anthropic" ? "anthropic" : "ollama");
+      setExtractionUseLlm(Boolean(data.extraction_use_llm));
       setHasAnthropicKey(Boolean(data.has_anthropic_key));
     } catch {
       /* backend offline */
@@ -39,6 +41,25 @@ export default function SettingsPage() {
       body: JSON.stringify({ name: "anthropic_api_key", value: value.trim() }),
     });
     setHasAnthropicKey(true);
+  }
+
+  async function saveExtractionUseLlm(enabled: boolean) {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/settings/llm`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extraction_use_llm: enabled }),
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+      setExtractionUseLlm(enabled);
+      setMessage(t(locale, "settings.saved"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleProviderChange(next: LlmProvider) {
@@ -127,6 +148,21 @@ export default function SettingsPage() {
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           onBlur={(e) => saveAnthropicKey(e.target.value)}
         />
+        <label className="flex items-start gap-2 text-sm pt-2 border-t border-border">
+          <input
+            type="checkbox"
+            checked={extractionUseLlm}
+            disabled={saving}
+            onChange={(e) => saveExtractionUseLlm(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            {t(locale, "settings.extractionLlm")}
+            <span className="block text-xs text-muted-foreground font-normal mt-1">
+              {t(locale, "settings.extractionLlmHint")}
+            </span>
+          </span>
+        </label>
         <p className="text-xs text-muted-foreground">{t(locale, "settings.keychainNote")}</p>
         {message && <p className="text-xs text-primary">{message}</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}

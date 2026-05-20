@@ -101,7 +101,8 @@ def run_kb_sync_job(job_id: str, request: SyncStartRequest, jobs: dict) -> None:
         log("Extracting and validating snapshot…")
         install_snapshot(archive, staging)
         manifest = atomic_swap(staging)
-        log(f"KB active — {manifest.total_chunks} chunks")
+        log(f"KB active — {manifest.total_chunks} chunks at {settings.kb_active_path}")
+        log("Weryfikacja może od razu korzystać z kb-active (bez restartu backendu).")
         set_step("atomic_swap", "done")
 
         job["status"] = "completed"

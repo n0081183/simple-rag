@@ -44,7 +44,7 @@ class ExtractRequest(BaseModel):
     language: Language = Language.pl
     product: str | None = None
     auto_detect_product: bool = False
-    use_llm: bool = Field(default_factory=_default_use_llm)
+    use_llm: bool | None = None
 
 
 class ExtractResponse(BaseModel):
@@ -60,6 +60,8 @@ class RequirementsListResponse(BaseModel):
     product_suggestions: list[ProductSuggestionOut] = Field(default_factory=list)
     auto_detect_warning: bool = False
     blocks_processed: int = 0
+    blocks_done: int = 0
+    extraction_mode: str | None = None
     error: str | None = None
 
 
@@ -84,14 +86,29 @@ class VerifyStatusResponse(BaseModel):
     error: str | None = None
 
 
-def _run_extraction(job_id: str, text: str, language: str, auto_detect: bool, use_llm: bool):
+def _resolve_use_llm(requested: bool | None) -> bool:
+    if os.environ.get("SIWZ_E2E") == "1":
+        return False
+    if requested is not None:
+        return requested
+    from app.config import get_settings
+
+    return get_settings().extraction_use_llm
+
+
+def _run_extraction(job_id: str, text: str, language: str, auto_detect: bool, use_llm: bool | None):
     _jobs[job_id]["status"] = "processing"
     _jobs[job_id]["auto_detect_used"] = auto_detect
+    effective_llm = _resolve_use_llm(use_llm)
+    _jobs[job_id]["extraction_mode"] = "heuristic+llm" if effective_llm else "heuristic"
     try:
-        pipeline = ExtractionPipeline(language=language, use_llm=use_llm)
+        pipeline = ExtractionPipeline(language=language, use_llm=effective_llm)
         result = pipeline.run(text=text, auto_detect=auto_detect)
         _jobs[job_id].update(result.model_dump())
+        _jobs[job_id]["blocks_done"] = result.blocks_processed
         _jobs[job_id]["status"] = "completed"
+        if result.error and not result.requirements:
+            _jobs[job_id]["error"] = result.error
     except Exception as e:
         _jobs[job_id]["status"] = "failed"
         _jobs[job_id]["error"] = str(e)
@@ -134,14 +151,13 @@ async def start_extraction(body: ExtractRequest, background_tasks: BackgroundTas
         raise HTTPException(400, "No text provided for extraction")
     job_id = str(uuid.uuid4())
     _jobs[job_id] = {"status": "queued", "requirements": []}
-    use_llm = body.use_llm if os.environ.get("SIWZ_E2E") != "1" else False
     background_tasks.add_task(
         _run_extraction,
         job_id,
         body.text,
         body.language.value,
         body.auto_detect_product,
-        use_llm,
+        body.use_llm,
     )
     return ExtractResponse(job_id=job_id, status="queued")
 
@@ -153,9 +169,11 @@ async def extract_upload(
     language: Language = Language.pl,
     auto_detect_product: bool = Form(False),
     pasted_text: str | None = Form(None),
-    use_llm: bool = Form(True),
+    use_llm: str | None = Form(None),
 ):
-    effective_llm = _default_use_llm() if os.environ.get("SIWZ_E2E") == "1" else use_llm
+    parsed_llm: bool | None = None
+    if use_llm is not None:
+        parsed_llm = use_llm.lower() in ("true", "1", "yes")
     data = await file.read()
     text = parse_upload_bytes(data, file.filename or "upload.pdf")
     if pasted_text and pasted_text.strip():
@@ -168,7 +186,7 @@ async def extract_upload(
         text,
         language.value,
         auto_detect_product,
-        effective_llm,
+        parsed_llm,
     )
     return ExtractResponse(job_id=job_id, status="queued")
 
@@ -191,6 +209,8 @@ def get_extraction(job_id: str):
         product_suggestions=parsed_suggestions,
         auto_detect_warning=job.get("auto_detect_warning", False),
         blocks_processed=job.get("blocks_processed", 0),
+        blocks_done=job.get("blocks_done", 0),
+        extraction_mode=job.get("extraction_mode"),
         error=job.get("error"),
     )
 

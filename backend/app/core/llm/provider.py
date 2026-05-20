@@ -30,8 +30,9 @@ class OllamaProvider(LLMProvider):
         s = get_settings()
         self.base_url = s.ollama_base_url.rstrip("/")
         self.model = s.ollama_model
+        self.timeout = s.ollama_timeout_seconds
 
-    def complete_json(self, system: str, user: str, schema: type[T] | None = None) -> dict:
+    def _chat_payload(self, system: str, user: str, *, json_mode: bool) -> dict:
         payload: dict = {
             "model": self.model,
             "messages": [
@@ -39,32 +40,41 @@ class OllamaProvider(LLMProvider):
                 {"role": "user", "content": user},
             ],
             "stream": False,
-            "format": "json",
+            "options": {"num_predict": 768, "temperature": 0.1},
         }
+        if json_mode:
+            payload["format"] = "json"
+        return payload
+
+    def complete_json(self, system: str, user: str, schema: type[T] | None = None) -> dict:
         try:
-            with httpx.Client(timeout=180.0) as client:
-                resp = client.post(f"{self.base_url}/api/chat", json=payload)
+            with httpx.Client(timeout=self.timeout) as client:
+                resp = client.post(
+                    f"{self.base_url}/api/chat",
+                    json=self._chat_payload(system, user, json_mode=True),
+                )
                 resp.raise_for_status()
                 content = resp.json()["message"]["content"]
             return json.loads(content)
+        except httpx.TimeoutException as e:
+            logger.warning("ollama_timeout model=%s error=%s", self.model, e)
+            return {}
         except Exception as e:
             logger.warning("ollama_error error=%s", e)
             return {}
 
     def complete_text(self, system: str, user: str) -> str:
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            "stream": False,
-        }
         try:
-            with httpx.Client(timeout=180.0) as client:
-                resp = client.post(f"{self.base_url}/api/chat", json=payload)
+            with httpx.Client(timeout=self.timeout) as client:
+                resp = client.post(
+                    f"{self.base_url}/api/chat",
+                    json=self._chat_payload(system, user, json_mode=False),
+                )
                 resp.raise_for_status()
                 return resp.json()["message"]["content"]
+        except httpx.TimeoutException as e:
+            logger.warning("ollama_timeout model=%s error=%s", self.model, e)
+            return ""
         except Exception as e:
             logger.warning("ollama_error error=%s", e)
             return ""
