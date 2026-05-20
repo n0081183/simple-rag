@@ -15,13 +15,15 @@ class SecretSetRequest(BaseModel):
 
 
 class LLMSettingsUpdate(BaseModel):
-    provider: str = Field(pattern="^(ollama|anthropic)$")
+    provider: str | None = Field(default=None, pattern="^(ollama|anthropic)$")
+    extraction_use_llm: bool | None = None
 
 
 class LLMSettingsResponse(BaseModel):
     provider: str
     ollama_model: str
     ollama_base_url: str
+    extraction_use_llm: bool
     has_anthropic_key: bool
     has_runpod_key: bool
     has_openai_key: bool = False
@@ -34,6 +36,7 @@ def get_llm_settings():
         provider=s.llm_provider,
         ollama_model=s.ollama_model,
         ollama_base_url=s.ollama_base_url,
+        extraction_use_llm=s.extraction_use_llm,
         has_anthropic_key=keychain.has_secret("anthropic_api_key"),
         has_runpod_key=keychain.has_secret("runpod_api_key"),
         has_openai_key=keychain.has_secret("openai_api_key"),
@@ -42,14 +45,20 @@ def get_llm_settings():
 
 @router.patch("/llm", response_model=LLMSettingsResponse)
 def update_llm_settings(body: LLMSettingsUpdate):
-    if body.provider == "anthropic" and not keychain.has_secret("anthropic_api_key"):
+    if body.provider is not None and body.provider == "anthropic" and not keychain.has_secret(
+        "anthropic_api_key"
+    ):
         raise HTTPException(
             400,
             "Anthropic API key not configured. Add it in Settings first.",
         )
     cfg = load_user_config()
-    cfg["llm_provider"] = body.provider
+    if body.provider is not None:
+        cfg["llm_provider"] = body.provider
+    if body.extraction_use_llm is not None:
+        cfg["extraction_use_llm"] = body.extraction_use_llm
     save_user_config(cfg)
+    get_settings.cache_clear()
     return get_llm_settings()
 
 

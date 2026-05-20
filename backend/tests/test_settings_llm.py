@@ -15,6 +15,7 @@ def test_get_llm_settings():
     data = res.json()
     assert data["provider"] in ("ollama", "anthropic")
     assert "ollama_model" in data
+    assert "extraction_use_llm" in data
 
 
 def test_patch_llm_provider_ollama(tmp_path, monkeypatch):

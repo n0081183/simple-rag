@@ -30,6 +30,9 @@ export const en = {
     exportXlsx: "Excel (XLSX)",
     emptyTitle: "No requirements yet",
     emptyDescription: "Upload a document or paste text to begin extraction.",
+    extractUseLlm: "Use LLM for this extraction (slow)",
+    extractNoResults: "No requirements found",
+    extractMode: "Extraction mode",
   },
   kb: {
     title: "Build / update knowledge base",
@@ -77,6 +80,9 @@ export const en = {
     keychainNote: "API keys are stored in the OS keychain, not in project files.",
     saved: "Settings saved",
     anthropicKeyRequired: "Configure Anthropic API key before switching to cloud LLM.",
+    extractionLlm: "LLM extraction (Ollama)",
+    extractionLlmHint:
+      "Off = fast heuristic (must/shall). On = slower Ollama refine (up to ~30 blocks).",
   },
   common: {
     loading: "Loading…",

@@ -116,6 +116,39 @@ def kb_test_connection(body: SyncStartRequest):
         raise HTTPException(400, str(e)) from e
 
 
+class InstallLocalResponse(BaseModel):
+    ok: bool
+    total_chunks: int
+    kb_path: str
+    message: str
+
+
+@router.post("/install-from-archive", response_model=InstallLocalResponse)
+def install_kb_from_archive():
+    """Install downloaded snapshot into kb-active (after manual scp or partial sync)."""
+    settings = get_settings()
+    archive = settings.data_dir / "kb_snapshot.tar.zst"
+    if not archive.is_file():
+        raise HTTPException(
+            404,
+            f"Archive not found: {archive}. Download from pod or complete KB sync first.",
+        )
+    from app.core.kb.snapshot import install_snapshot
+    from app.core.kb.swap import atomic_swap
+
+    try:
+        install_snapshot(archive, settings.kb_staging_path)
+        manifest = atomic_swap()
+    except Exception as e:
+        raise HTTPException(400, str(e)) from e
+    return InstallLocalResponse(
+        ok=True,
+        total_chunks=manifest.total_chunks,
+        kb_path=str(settings.kb_active_path),
+        message="Knowledge base activated — verification can use kb-active immediately.",
+    )
+
+
 @router.post("/pods/{pod_id}/stop")
 def stop_pod(pod_id: str):
     try:

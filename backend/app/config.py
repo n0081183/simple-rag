@@ -1,6 +1,7 @@
 """Application configuration via environment and Pydantic Settings."""
 
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -35,6 +36,15 @@ class Settings(BaseSettings):
     retrieval_top_n: int = 8
 
     llm_provider: str = "ollama"  # ollama | anthropic
+    ollama_timeout_seconds: float = 300.0
+    extraction_max_llm_blocks: int = 30
+
+    @property
+    def extraction_use_llm(self) -> bool:
+        """Default fast heuristic extraction; enable LLM in Settings or EXTRACTION_USE_LLM=1."""
+        if os.environ.get("EXTRACTION_USE_LLM", "").lower() in ("1", "true", "yes"):
+            return True
+        return bool(load_user_config().get("extraction_use_llm", False))
 
     @property
     def kb_active_path(self) -> Path:

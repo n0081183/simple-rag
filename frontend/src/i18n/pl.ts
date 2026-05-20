@@ -33,6 +33,9 @@ export const pl: TranslationKeys = {
     exportXlsx: "Excel (XLSX)",
     emptyTitle: "Brak wymagań",
     emptyDescription: "Wgraj dokument lub wklej tekst, aby rozpocząć ekstrakcję.",
+    extractUseLlm: "Użyj LLM przy tej ekstrakcji (wolno)",
+    extractNoResults: "Nie znaleziono wymagań",
+    extractMode: "Tryb ekstrakcji",
   },
   kb: {
     title: "Budowa / aktualizacja bazy wiedzy",
@@ -80,6 +83,9 @@ export const pl: TranslationKeys = {
     keychainNote: "Klucze API są przechowywane w keychainie systemu, nie w plikach projektu.",
     saved: "Zapisano ustawienia",
     anthropicKeyRequired: "Skonfiguruj klucz Anthropic przed przełączeniem na LLM w chmurze.",
+    extractionLlm: "Ekstrakcja z LLM (Ollama)",
+    extractionLlmHint:
+      "Wyłączone = szybka heurystyka (musi/must). Włączone = wolniejsze doprecyzowanie Ollama (max ~30 bloków).",
   },
   common: {
     loading: "Ładowanie…",

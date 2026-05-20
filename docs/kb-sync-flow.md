@@ -12,7 +12,9 @@
 |------|--------|
 | Bootstrap | Upload `runpod/` + `bootstrap.sh` (CUDA, venv, **staged pip** + swap) |
 | Pipeline | `pipeline/run_all.sh` — sync → chunk → embed → index → export |
-| Download | SFTP `kb_snapshot.tar.zst` → `~/.siwz-rag-lite/kb_snapshot.tar.zst` (then extract → `kb-staging/`) |
+| Download | SFTP → `~/.siwz-rag-lite/kb_snapshot.tar.zst` |
+| Activate | `atomic_swap`: `kb-staging/` → `kb-active/` (app uses KB immediately) |
+| Manual install | `POST /api/kb/install-from-archive` if archive already on disk |
 | Swap | Extract, validate manifest, atomic rename to `kb-active` |
 
 **Dry run** (UI checkbox or `make sync-kb`): builds local seed KB without RunPod.

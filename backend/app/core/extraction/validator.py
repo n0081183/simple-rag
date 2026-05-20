@@ -8,6 +8,7 @@ import re
 from pydantic import ValidationError
 
 from app.core.extraction.prompts import block_validate_system
+from app.core.extraction.presplit import _has_requirement_keyword
 from app.core.extraction.schemas import (
     BlockValidationResult,
     ExtractedRequirement,
@@ -32,15 +33,28 @@ class BlockValidator:
                 return reqs
         return self._validate_heuristic(block, block_index)
 
+    def validate_heuristic(self, block: str, block_index: int) -> list[ExtractedRequirement]:
+        return self._validate_heuristic(block, block_index)
+
+    def validate_llm(self, block: str, block_index: int) -> list[ExtractedRequirement]:
+        """LLM-only pass (caller handles fallback)."""
+        if not self.use_llm or not self._llm:
+            return []
+        return self._validate_llm(block, block_index)
+
     def _validate_heuristic(self, block: str, block_index: int) -> list[ExtractedRequirement]:
-        modal = re.search(r"\b(musi|muszą|shall|must|wymaga)\b", block, re.IGNORECASE)
-        if not modal and len(block) < 40:
+        block = block.strip()
+        if len(block) < 20:
+            return []
+        modal = re.search(r"\b(musi|muszą|shall|must|wymaga|powinien|powinna|required)\b", block, re.IGNORECASE)
+        bullet = re.match(r"^[\s]*(?:[-•●]|\d+[\.\)])\s+", block)
+        if not modal and not bullet and len(block) < 60:
             return []
         title = " ".join(block.split()[:8])[:60]
         return [
             ExtractedRequirement(
                 title=title,
-                text=block.strip(),
+                text=block,
                 category=RequirementCategory.functional,
                 priority=RequirementPriority.unknown,
                 source_block_index=block_index,
@@ -52,11 +66,14 @@ class BlockValidator:
         user = f"BLOCK:\n{block[:2000]}"
         raw = self._llm.complete_json(system, user, BlockValidationResult) if self._llm else {}
 
+        if not raw:
+            logger.info("llm_block_skip block=%d reason=empty_or_timeout", block_index)
+            return []
+
         try:
             result = BlockValidationResult.model_validate(raw)
         except ValidationError:
-            # Fallback: parse REQ: lines from text response
-            return self._parse_req_lines(block, block_index)
+            return self._parse_req_lines_heuristic_fallback(block, block_index)
 
         if not result.is_requirement:
             return []
@@ -64,11 +81,6 @@ class BlockValidator:
         texts = result.split_into or [block.strip()]
         reqs: list[ExtractedRequirement] = []
         cat = RequirementCategory.other
-        try:
-            cat = RequirementCategory(result.category) if hasattr(result, "category") else cat
-        except (ValueError, TypeError):
-            pass
-
         pri = RequirementPriority.unknown
         extra = raw if isinstance(raw, dict) else {}
         if extra.get("category"):
@@ -98,26 +110,10 @@ class BlockValidator:
             )
         return reqs
 
-    def _parse_req_lines(self, block: str, block_index: int) -> list[ExtractedRequirement]:
-        """Legacy v3 line protocol fallback."""
-        if self._llm:
-            system = block_validate_system(self.language)
-            text = self._llm.complete_text(system, f"BLOCK:\n{block[:2000]}")
-        else:
-            text = ""
-        reqs = []
-        for line in text.splitlines():
-            line = line.strip()
-            if line.upper().startswith("REQ:"):
-                body = line[4:].strip()
-                if body:
-                    reqs.append(
-                        ExtractedRequirement(
-                            title=" ".join(body.split()[:6])[:80],
-                            text=body,
-                            source_block_index=block_index,
-                        )
-                    )
-        if not reqs and re.search(r"\b(musi|must|shall)\b", block, re.I):
+    def _parse_req_lines_heuristic_fallback(
+        self, block: str, block_index: int
+    ) -> list[ExtractedRequirement]:
+        """No second LLM call on parse failure — avoids timeout storms."""
+        if re.search(r"\b(musi|must|shall|wymaga)\b", block, re.I):
             return self._validate_heuristic(block, block_index)
-        return reqs
+        return []
