@@ -213,6 +213,7 @@ export default function VerifyPage() {
               </label>
               <textarea
                 id="req-text"
+                data-testid="verify-textarea"
                 rows={10}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -224,6 +225,7 @@ export default function VerifyPage() {
           <div>
             <label className="text-sm font-medium">{t(locale, "verify.product")}</label>
             <select
+              data-testid="verify-product-select"
               value={product}
               onChange={(e) => setProduct(e.target.value)}
               className="mt-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
@@ -246,6 +248,7 @@ export default function VerifyPage() {
             </label>
             <button
               type="button"
+              data-testid="verify-extract-btn"
               onClick={handleExtract}
               disabled={loading || (!text.trim() && !file)}
               className={cn(
@@ -307,7 +310,10 @@ export default function VerifyPage() {
               </div>
             </div>
           )}
-          <div className="border-b border-border bg-muted/40 px-4 py-3 flex justify-between items-center">
+          <div
+            data-testid="verify-review"
+            className="border-b border-border bg-muted/40 px-4 py-3 flex justify-between items-center"
+          >
             <h2 className="text-sm font-medium">{t(locale, "verify.review")}</h2>
             <span className="text-xs text-muted-foreground">{requirements.length} items</span>
           </div>

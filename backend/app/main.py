@@ -60,8 +60,17 @@ if FRONTEND_OUT.is_dir():
         if full_path.startswith("api"):
             return {"detail": "Not found"}
         candidate = FRONTEND_OUT / full_path
+        if candidate.is_dir():
+            index_in_dir = candidate / "index.html"
+            if index_in_dir.is_file():
+                return FileResponse(index_in_dir)
         if candidate.is_file():
             return FileResponse(candidate)
+        # Next.js static export: /settings → settings/index.html
+        if not full_path.endswith("/"):
+            nested = FRONTEND_OUT / full_path / "index.html"
+            if nested.is_file():
+                return FileResponse(nested)
         index = FRONTEND_OUT / "index.html"
         if index.is_file():
             return FileResponse(index)

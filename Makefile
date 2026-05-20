@@ -48,6 +48,9 @@ test: ## pytest + vitest
 	$(UV) run pytest backend/tests -q
 	cd $(FRONTEND) && npm run test --if-present
 
+e2e: build ## Playwright E2E (heuristic extraction, SIWZ_E2E=1)
+	bash scripts/run_e2e.sh
+
 preflight: ## Check environment (Ollama, KB path, GPU optional)
 	$(UV) run python scripts/preflight.py
 

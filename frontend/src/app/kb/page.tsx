@@ -243,6 +243,7 @@ export default function KbPage() {
           </label>
           <button
             type="button"
+            data-testid="kb-start-btn"
             onClick={handleStart}
             disabled={syncing || (!dryRun && !podId)}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"

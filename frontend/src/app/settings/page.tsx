@@ -101,6 +101,7 @@ export default function SettingsPage() {
           <input
             type="radio"
             name="llm"
+            data-testid="settings-llm-ollama"
             checked={provider === "ollama"}
             disabled={saving}
             onChange={() => handleProviderChange("ollama")}
@@ -112,6 +113,7 @@ export default function SettingsPage() {
           <input
             type="radio"
             name="llm"
+            data-testid="settings-llm-anthropic"
             checked={provider === "anthropic"}
             disabled={saving}
             onChange={() => handleProviderChange("anthropic")}

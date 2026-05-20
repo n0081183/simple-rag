@@ -47,6 +47,7 @@ flowchart LR
 | `make sync-kb` | Sync bazy (CLI) |
 | `make preflight` | Sprawdzenie Ollama / LanceDB |
 | `make seed-kb` | Budowa seedowej bazy wiedzy (dev) |
+| `make e2e` | Testy Playwright E2E (UI + API health) |
 
 ## Bezpieczeństwo
 
@@ -58,7 +59,7 @@ Klucze RunPod i API LLM — **wyłącznie keychain OS** (`siwz-rag-lite`), nigdy
 - [x] M1: Ekstrakcja LLM, RAG, weryfikacja, raport MD, gold set 20
 - [x] M2: RunPod SSH pipeline, snapshot `.tar.zst`, atomic swap
 - [x] M3: DOCX/XLSX, auto-detect (top 3 + potwierdzenie), LLM toggle, anonimizacja raportów
-- [ ] M4: Playwright E2E, Tauri (opcjonalnie)
+- [x] M4: Playwright E2E, dokumentacja Tauri (`docs/desktop-tauri.md`)
 
 ## Licencja
 
