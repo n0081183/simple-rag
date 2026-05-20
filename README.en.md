@@ -37,6 +37,7 @@ See [docs/architecture.md](docs/architecture.md) and [docs/decisions/](docs/deci
 | `make eval` | Gold-set evaluation |
 | `make sync-kb` | KB sync CLI |
 | `make preflight` | Environment check |
+| `make e2e` | Playwright E2E tests |
 
 ## Security
 
@@ -48,7 +49,7 @@ RunPod and LLM API keys are stored in the **OS keychain** only — never in the 
 - [x] M1: LLM extraction, RAG, verification, MD report, gold set
 - [x] M2: RunPod SSH pipeline, snapshot, atomic swap
 - [x] M3: DOCX/XLSX exports, product auto-detect (top 3 + confirm), LLM toggle, report anonymization
-- [ ] M4: Playwright E2E, Tauri (optional)
+- [x] M4: Playwright E2E, Tauri packaging guide (optional desktop)
 
 ## License
 

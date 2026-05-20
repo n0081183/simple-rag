@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import uuid
 from enum import Enum
 from typing import Any
@@ -28,6 +29,11 @@ _jobs: dict[str, dict[str, Any]] = {}
 _verify_jobs: dict[str, dict[str, Any]] = {}
 
 
+def _default_use_llm() -> bool:
+    """Heuristic-only extraction in CI/E2E (SIWZ_E2E=1)."""
+    return os.environ.get("SIWZ_E2E") != "1"
+
+
 class Language(str, Enum):
     pl = "pl"
     en = "en"
@@ -38,7 +44,7 @@ class ExtractRequest(BaseModel):
     language: Language = Language.pl
     product: str | None = None
     auto_detect_product: bool = False
-    use_llm: bool = True
+    use_llm: bool = Field(default_factory=_default_use_llm)
 
 
 class ExtractResponse(BaseModel):
@@ -128,13 +134,14 @@ async def start_extraction(body: ExtractRequest, background_tasks: BackgroundTas
         raise HTTPException(400, "No text provided for extraction")
     job_id = str(uuid.uuid4())
     _jobs[job_id] = {"status": "queued", "requirements": []}
+    use_llm = body.use_llm if os.environ.get("SIWZ_E2E") != "1" else False
     background_tasks.add_task(
         _run_extraction,
         job_id,
         body.text,
         body.language.value,
         body.auto_detect_product,
-        body.use_llm,
+        use_llm,
     )
     return ExtractResponse(job_id=job_id, status="queued")
 
@@ -148,6 +155,7 @@ async def extract_upload(
     pasted_text: str | None = Form(None),
     use_llm: bool = Form(True),
 ):
+    effective_llm = _default_use_llm() if os.environ.get("SIWZ_E2E") == "1" else use_llm
     data = await file.read()
     text = parse_upload_bytes(data, file.filename or "upload.pdf")
     if pasted_text and pasted_text.strip():
@@ -160,7 +168,7 @@ async def extract_upload(
         text,
         language.value,
         auto_detect_product,
-        use_llm,
+        effective_llm,
     )
     return ExtractResponse(job_id=job_id, status="queued")
 

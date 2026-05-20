@@ -50,6 +50,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <nav className="flex-1 space-y-0.5 p-3">
             {navItems.map(({ href, icon: Icon, key }) => {
+              const testId =
+                href === "/" ? "nav-verify" : href.startsWith("/kb") ? "nav-kb" : "nav-settings";
               const active =
                 href === "/"
                   ? pathname === "/" || pathname === ""
@@ -58,6 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={href}
                   href={href}
+                  data-testid={testId}
                   className={cn(
                     "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     active
