@@ -30,8 +30,8 @@ The portal returns **HTTP 429** when crawled too fast. SIWZ ships a patched `cor
 
 | Setting | Default | Env override |
 |---------|---------|--------------|
-| Request rate | **0.35 req/s** | `RATE_LIMIT` |
-| Topic download workers | **1** (sequential) | `CORTEX_SYNC_TOPIC_WORKERS` |
+| Request rate | **0.35 req/s** (UI slider on KB page) | `rate_limit_rps` in sync API; pod env `RATE_LIMIT` |
+| Topic download workers | **1** (sequential) | `topic_workers` in sync API; `CORTEX_SYNC_TOPIC_WORKERS` |
 | Partial failures | **continue pipeline** | default; `CORTEX_SYNC_STRICT=1` to fail |
 
 Bootstrap always reinstalls the editable vendor package (even when `.bootstrap_ok` exists) so an old git install cannot shadow it.

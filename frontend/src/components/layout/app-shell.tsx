@@ -39,9 +39,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <ThemeSync theme={theme} />
       <div className="flex min-h-screen bg-background text-foreground">
-        <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
-          <div className="border-b border-border px-4 py-4">
-            <div className="text-sm font-semibold tracking-tight">
+        <aside className="flex w-56 shrink-0 flex-col border-r border-[hsl(var(--soc)/0.25)] bg-sidebar text-sidebar-foreground">
+          <div className="border-b border-[hsl(var(--soc)/0.2)] px-4 py-4">
+            <div className="text-sm font-semibold tracking-tight text-[hsl(var(--soc))]">
               {t(locale, "app.name")}
             </div>
             <div className="text-xs text-muted-foreground mt-0.5">
@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     active
-                      ? "bg-accent text-accent-foreground"
+                      ? "bg-primary/15 text-[hsl(var(--soc))] border border-[hsl(var(--soc)/0.3)]"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >

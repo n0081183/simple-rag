@@ -169,8 +169,9 @@ def _run_remote_pipeline(ssh: SSHSession, request: SyncStartRequest, log, set_st
     products = " ".join(request.products)
     incr = "1" if request.incremental else "0"
     rn = "1" if request.include_release_notes else "0"
-    rate_limit = os.environ.get("CORTEX_DOCS_RATE_LIMIT", "0.35")
-    topic_workers = os.environ.get("CORTEX_SYNC_TOPIC_WORKERS", "1")
+    rate_limit = os.environ.get("CORTEX_DOCS_RATE_LIMIT") or str(request.rate_limit_rps)
+    topic_workers = os.environ.get("CORTEX_SYNC_TOPIC_WORKERS") or str(request.topic_workers)
+    log(f"Docs download: {rate_limit} req/s, {topic_workers} topic worker(s)")
     pipeline_cmd = (
         f"WORKSPACE={REMOTE_WORKSPACE} PRODUCTS='{products}' INCREMENTAL={incr} "
         f"INCLUDE_RELEASE_NOTES={rn} EMBED_BATCH_SIZE=64 "

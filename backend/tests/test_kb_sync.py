@@ -18,6 +18,12 @@ def test_pipeline_failure_message_falls_back_to_recent_log():
     assert "FAILED: pipeline failed" in msg
 
 
+def test_sync_start_request_custom_rate():
+    req = SyncStartRequest(rate_limit_rps=0.5, topic_workers=2)
+    assert req.rate_limit_rps == 0.5
+    assert req.topic_workers == 2
+
+
 def test_kb_sync_dry_run():
     jobs: dict = {"test-job": {"status": "queued", "logs": []}}
     req = SyncStartRequest(pod_id="", dry_run=True)

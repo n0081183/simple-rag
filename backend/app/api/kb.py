@@ -40,6 +40,18 @@ class SyncStartRequest(BaseModel):
     ssh_key_path: str | None = None
     include_release_notes: bool = False
     dry_run: bool = False
+    rate_limit_rps: float = Field(
+        default=0.35,
+        ge=0.1,
+        le=2.0,
+        description="HTTP requests per second when fetching Cortex docs (portal rate-limits bots)",
+    )
+    topic_workers: int = Field(
+        default=1,
+        ge=1,
+        le=4,
+        description="Parallel topic downloads per publication (higher = faster but more 429s)",
+    )
 
 
 class SyncJobResponse(BaseModel):
