@@ -126,7 +126,12 @@ def _run_remote_pipeline(ssh: SSHSession, request: SyncStartRequest, log, set_st
     ssh.upload_tree(runpod_dir, f"{REMOTE_WORKSPACE}/runpod")
     ssh.run(f"chmod +x {REMOTE_WORKSPACE}/runpod/bootstrap.sh {REMOTE_WORKSPACE}/runpod/pipeline/run_all.sh")
 
-    log("Running bootstrap.sh…")
+    code, _, _ = ssh.run(f"test -f {REMOTE_WORKSPACE}/.bootstrap_ok")
+    if code == 0:
+        log("Bootstrap marker found — quick verify (skip reinstall if OK)")
+    else:
+        log("Running bootstrap.sh (staged pip + swap; first run often 10–20 min)…")
+
     code, _, err = ssh.run(
         f"WORKSPACE={REMOTE_WORKSPACE} bash {REMOTE_WORKSPACE}/runpod/bootstrap.sh",
         on_line=log,

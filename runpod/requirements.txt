@@ -1,8 +1,19 @@
-sentence-transformers>=3.0.0
-FlagEmbedding>=1.2.10
+# GPU pod dependencies are installed in stages by bootstrap.sh (OOM-safe).
+# Do not run: pip install -r requirements.txt  (installs everything at once).
+#
+# Stages:
+#   1. torch (cu124 index)
+#   2. lancedb, pyarrow, selectolax, tqdm, requests, zstandard
+#   3. sentence-transformers
+#   4. FlagEmbedding
+#   5. cortex-docs-sync (git)
+
 lancedb>=0.17.0
 pyarrow>=18.0.0
 selectolax>=0.3.27
 tqdm>=4.66.0
 requests>=2.31.0
+zstandard>=0.22.0
+sentence-transformers>=3.0.0,<6
+FlagEmbedding>=1.2.10,<2
 cortex-docs-sync @ git+https://github.com/n0081183/cortex-docs-sync-v3.git
