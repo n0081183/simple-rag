@@ -1,5 +1,6 @@
 """Application configuration via environment and Pydantic Settings."""
 
+import json
 from functools import lru_cache
 from pathlib import Path
 
@@ -51,10 +52,32 @@ class Settings(BaseSettings):
     def logs_path(self) -> Path:
         return self.data_dir / "logs"
 
+    @property
+    def user_config_path(self) -> Path:
+        return self.data_dir / "user_config.json"
+
+
+def load_user_config() -> dict:
+    settings = Settings()
+    path = settings.user_config_path
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return {}
+
+
+def save_user_config(data: dict) -> None:
+    settings = Settings()
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    settings.user_config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    get_settings.cache_clear()
+
 
 @lru_cache
 def get_settings() -> Settings:
     settings = Settings()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.logs_path.mkdir(parents=True, exist_ok=True)
+    user = load_user_config()
+    if user.get("llm_provider"):
+        settings.llm_provider = user["llm_provider"]
     return settings

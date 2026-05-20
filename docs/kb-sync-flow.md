@@ -6,19 +6,18 @@
 - RunPod API key and SSH access configured in app Settings
 - Local Ollama optional (only for verification, not sync)
 
-## Steps (UI or `make sync-kb`)
+## Steps (UI or `make sync-kb` dry-run)
 
-| Step | Remote action |
-|------|----------------|
-| Bootstrap | `runpod/bootstrap.sh` — venv, torch CUDA check |
-| Clone sync tool | pip install `cortex-docs-sync` |
-| Sync docs | `cortex-docs-sync --output-dir /workspace/cortex_docs` |
-| Chunk | `pipeline/chunk_html.py` |
-| Embed | `pipeline/embed_gpu.py` (BGE-M3 FP16) |
-| Index | `pipeline/build_index.py` (LanceDB) |
-| Export | `pipeline/export_snapshot.py` → `.tar.zst` |
-| Download | SCP to `~/.siwz-rag-lite/kb-staging/` |
-| Swap | Validate `manifest.json`, rename to `kb-active` |
+| Step | Action |
+|------|--------|
+| Bootstrap | Upload `runpod/` + `bootstrap.sh` (CUDA, venv, deps) |
+| Pipeline | `pipeline/run_all.sh` — sync → chunk → embed → index → export |
+| Download | SFTP `kb_snapshot.tar.zst` → `kb-staging/` |
+| Swap | Extract, validate manifest, atomic rename to `kb-active` |
+
+**Dry run** (UI checkbox or `make sync-kb`): builds local seed KB without RunPod.
+
+**Test connection**: `POST /api/kb/test-connection` — SSH + `nvidia-smi`, or dry-run seed build.
 
 ## Incremental mode
 

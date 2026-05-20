@@ -17,6 +17,13 @@ type Req = {
   enabled: boolean;
 };
 
+type ProductSuggestion = {
+  product: string;
+  score: number;
+  lexical_score?: number;
+  semantic_score?: number;
+};
+
 async function poll<T>(fn: () => Promise<T>, ok: (d: T) => boolean, ms = 1500, max = 120): Promise<T> {
   for (let i = 0; i < max; i++) {
     const d = await fn();
@@ -31,8 +38,11 @@ export default function VerifyPage() {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [autoDetect, setAutoDetect] = useState(false);
+  const [anonymize, setAnonymize] = useState(false);
   const [product, setProduct] = useState("xdr");
   const [products, setProducts] = useState<{ id: string; chunk_count: number }[]>([]);
+  const [productSuggestions, setProductSuggestions] = useState<ProductSuggestion[]>([]);
+  const [showAutoDetectWarning, setShowAutoDetectWarning] = useState(false);
   const [phase, setPhase] = useState<"input" | "review" | "results">("input");
   const [loading, setLoading] = useState(false);
   const [extractJobId, setExtractJobId] = useState<string | null>(null);
@@ -58,6 +68,8 @@ export default function VerifyPage() {
   const handleExtract = useCallback(async () => {
     if (!text.trim() && !file) return;
     setLoading(true);
+    setProductSuggestions([]);
+    setShowAutoDetectWarning(false);
     try {
       let jobId: string;
       if (file) {
@@ -97,12 +109,19 @@ export default function VerifyPage() {
           enabled: r.enabled !== false,
         }))
       );
-      if (final.product_suggestion) setProduct(final.product_suggestion);
+      if (autoDetect && final.product_suggestions?.length) {
+        setProductSuggestions(final.product_suggestions);
+        setShowAutoDetectWarning(Boolean(final.auto_detect_warning));
+      }
       setPhase("review");
     } finally {
       setLoading(false);
     }
   }, [text, file, locale, autoDetect]);
+
+  const applySuggestion = (suggested: string) => {
+    setProduct(suggested);
+  };
 
   const handleVerify = useCallback(async () => {
     if (!extractJobId) return;
@@ -121,6 +140,7 @@ export default function VerifyPage() {
           job_id: extractJobId,
           product,
           language: locale,
+          anonymize,
           requirement_ids: requirements.filter((r) => r.enabled).map((r) => r.id),
         }),
       });
@@ -129,7 +149,8 @@ export default function VerifyPage() {
       const final = await poll(
         () => fetch(`${API_BASE}/api/requirements/verify/${job_id}`).then((r) => r.json()),
         (d) => d.status === "completed" || d.status === "failed",
-        2000
+        2000,
+        180
       );
       if (final.status === "failed") throw new Error(final.error || "verify failed");
       setVerifyProgress({ done: final.progress, total: final.total });
@@ -137,14 +158,15 @@ export default function VerifyPage() {
     } finally {
       setLoading(false);
     }
-  }, [extractJobId, requirements, product, locale]);
+  }, [extractJobId, requirements, product, locale, anonymize]);
 
-  const exportMd = () => {
-    if (!verifyJobId) return;
-    window.open(
-      `${API_BASE}/api/requirements/verify/${verifyJobId}/report.md?language=${locale}&auto_detect_warning=${autoDetect}`,
-      "_blank"
-    );
+  const exportUrl = (format: "md" | "docx" | "xlsx") => {
+    if (!verifyJobId) return "#";
+    const q = new URLSearchParams({
+      language: locale,
+      anonymize: String(anonymize),
+    });
+    return `${API_BASE}/api/requirements/verify/${verifyJobId}/report.${format}?${q}`;
   };
 
   return (
@@ -154,7 +176,7 @@ export default function VerifyPage() {
         <p className="mt-1 text-sm text-muted-foreground max-w-2xl">{t(locale, "verify.subtitle")}</p>
       </header>
 
-      {autoDetect && (
+      {showAutoDetectWarning && (
         <div
           role="alert"
           className="flex gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -238,7 +260,53 @@ export default function VerifyPage() {
       )}
 
       {phase === "review" && (
-        <section className="rounded-lg border border-border overflow-hidden">
+        <section className="rounded-lg border border-border overflow-hidden space-y-0">
+          {productSuggestions.length > 0 && (
+            <div className="border-b border-border bg-muted/30 px-4 py-4 space-y-3">
+              <h3 className="text-sm font-medium">{t(locale, "verify.productSuggestions")}</h3>
+              <ul className="space-y-2">
+                {productSuggestions.map((s) => (
+                  <li
+                    key={s.product}
+                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                  >
+                    <span>
+                      <span className="font-medium capitalize">{s.product.replace(/_/g, " ")}</span>
+                      <span className="text-muted-foreground ml-2">
+                        {t(locale, "verify.score")}: {(s.score * 100).toFixed(0)}%
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => applySuggestion(s.product)}
+                      className={cn(
+                        "rounded-md border px-3 py-1 text-xs",
+                        product === s.product
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:bg-muted"
+                      )}
+                    >
+                      {t(locale, "verify.useSuggested")}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <div>
+                <label className="text-sm font-medium">{t(locale, "verify.product")}</label>
+                <select
+                  value={product}
+                  onChange={(e) => setProduct(e.target.value)}
+                  className="mt-1 block rounded-md border border-border bg-background px-3 py-2 text-sm"
+                >
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.id} ({p.chunk_count})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
           <div className="border-b border-border bg-muted/40 px-4 py-3 flex justify-between items-center">
             <h2 className="text-sm font-medium">{t(locale, "verify.review")}</h2>
             <span className="text-xs text-muted-foreground">{requirements.length} items</span>
@@ -262,7 +330,15 @@ export default function VerifyPage() {
               </li>
             ))}
           </ul>
-          <div className="border-t border-border px-4 py-3 flex gap-3">
+          <div className="border-t border-border px-4 py-3 flex flex-wrap gap-3 items-center">
+            <label className="flex items-center gap-2 text-sm mr-auto">
+              <input
+                type="checkbox"
+                checked={anonymize}
+                onChange={(e) => setAnonymize(e.target.checked)}
+              />
+              {t(locale, "verify.anonymize")}
+            </label>
             <button
               type="button"
               onClick={() => setPhase("input")}
@@ -293,15 +369,30 @@ export default function VerifyPage() {
           )}
           {!loading && results.length > 0 && (
             <>
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={exportMd}
+              <div className="flex flex-wrap justify-end gap-2">
+                <a
+                  href={exportUrl("md")}
+                  target="_blank"
+                  rel="noreferrer"
                   className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
                 >
                   <Download className="h-4 w-4" />
-                  Markdown
-                </button>
+                  {t(locale, "verify.exportMd")}
+                </a>
+                <a
+                  href={exportUrl("docx")}
+                  className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
+                >
+                  <Download className="h-4 w-4" />
+                  {t(locale, "verify.exportDocx")}
+                </a>
+                <a
+                  href={exportUrl("xlsx")}
+                  className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
+                >
+                  <Download className="h-4 w-4" />
+                  {t(locale, "verify.exportXlsx")}
+                </a>
               </div>
               <ResultsTable rows={results} />
             </>
@@ -311,4 +402,3 @@ export default function VerifyPage() {
     </div>
   );
 }
-

@@ -170,7 +170,7 @@ export default function KbPage() {
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="SSH host (optional)"
+              placeholder={t(locale, "kb.sshHost")}
               value={sshHost}
               onChange={(e) => setSshHost(e.target.value)}
               className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-mono"
@@ -180,7 +180,8 @@ export default function KbPage() {
               value={sshPort}
               onChange={(e) => setSshPort(e.target.value)}
               className="w-20 rounded-md border border-border bg-background px-3 py-2 text-sm font-mono"
-              title="SSH port"
+              title={t(locale, "kb.sshPort")}
+              aria-label={t(locale, "kb.sshPort")}
             />
           </div>
           {gpuInfo && <p className="text-xs text-muted-foreground font-mono">{gpuInfo}</p>}
@@ -238,7 +239,7 @@ export default function KbPage() {
               checked={dryRun}
               onChange={(e) => setDryRun(e.target.checked)}
             />
-            Dry run (local seed KB, no RunPod)
+            {t(locale, "kb.dryRun")}
           </label>
           <button
             type="button"
