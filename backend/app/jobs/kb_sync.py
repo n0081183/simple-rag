@@ -117,9 +117,32 @@ def _resolve_ssh(request: SyncStartRequest, log) -> tuple[str, int]:
     return info.public_ip, request.ssh_port or info.ssh_port or 22
 
 
+def _pipeline_failure_message(code: int, out: str, err: str, recent_log: list[str]) -> str:
+    """Build a useful error when SSH stderr is empty (common with PTY)."""
+    combined = (out or "").strip()
+    if err and err.strip():
+        combined = f"{combined}\n{err.strip()}".strip() if combined else err.strip()
+    tail = combined.splitlines()[-5:] if combined else []
+    if not tail and recent_log:
+        tail = recent_log[-5:]
+    hint = "\n".join(tail) if tail else "see job logs above (docs-sync / pipeline output)"
+    return (
+        f"pipeline failed (exit {code}). "
+        f"If docs-sync shows Failed:N with 429, pull latest runpod/ and re-bootstrap. "
+        f"{hint}"
+    )
+
+
 def _run_remote_pipeline(ssh: SSHSession, request: SyncStartRequest, log, set_step) -> None:
     root = _repo_root()
     runpod_dir = root / "runpod"
+    recent: list[str] = []
+
+    def log_and_remember(msg: str) -> None:
+        recent.append(msg)
+        if len(recent) > 80:
+            del recent[:-80]
+        log(msg)
 
     set_step("bootstrap", "running")
     log("Uploading runpod/ scripts to pod…")
@@ -133,12 +156,12 @@ def _run_remote_pipeline(ssh: SSHSession, request: SyncStartRequest, log, set_st
     else:
         log("Running bootstrap.sh (staged pip + swap; first run often 10–20 min)…")
 
-    code, _, err = ssh.run(
+    code, bout, err = ssh.run(
         f"WORKSPACE={REMOTE_WORKSPACE} bash {REMOTE_WORKSPACE}/runpod/bootstrap.sh",
-        on_line=log,
+        on_line=log_and_remember,
     )
     if code != 0:
-        raise RuntimeError(f"bootstrap failed: {err}")
+        raise RuntimeError(_pipeline_failure_message(code, bout, err, recent).replace("pipeline", "bootstrap"))
     set_step("bootstrap", "done")
     set_step("clone_docs_sync", "done")
 
@@ -155,15 +178,9 @@ def _run_remote_pipeline(ssh: SSHSession, request: SyncStartRequest, log, set_st
         f"bash {REMOTE_WORKSPACE}/runpod/pipeline/run_all.sh"
     )
     log("Starting full pipeline on pod (sync → chunk → embed → index → export)…")
-    code, out, err = ssh.run(pipeline_cmd, on_line=log)
+    code, out, err = ssh.run(pipeline_cmd, on_line=log_and_remember)
     if code != 0:
-        tail = (out or err or "").strip().splitlines()[-3:]
-        hint = "\n".join(tail) if tail else "see logs above"
-        raise RuntimeError(
-            f"pipeline failed (exit {code}). "
-            f"If docs-sync shows 'Partial sync' or Failed:1, set ALLOW_PARTIAL=1 or pull latest runpod/. "
-            f"{hint}"
-        )
+        raise RuntimeError(_pipeline_failure_message(code, out, err, recent))
     for s in ("sync_docs", "chunk_html", "embed_gpu", "build_index", "export_snapshot"):
         set_step(s, "done")
 
