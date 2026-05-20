@@ -60,7 +60,23 @@ def fetch_publication(
 
     Returns (topic_count, bytes_written).
     """
-    topics = client.get_topics(pub.map_id)
+    topics = None
+    for pub_attempt in range(1, 4):
+        try:
+            topics = client.get_topics(pub.map_id)
+            break
+        except Exception as exc:
+            if pub_attempt >= 3:
+                raise
+            cooldown = 30 * pub_attempt
+            logger.warning(
+                "get_topics failed for %s (attempt %d/3): %s — cooldown %ds",
+                pub.title,
+                pub_attempt,
+                exc,
+                cooldown,
+            )
+            time.sleep(cooldown)
     if not topics:
         logger.warning("Publication %s (%s) has no topics — skipping", pub.title, pub.map_id)
         return (0, 0)
@@ -77,7 +93,7 @@ def fetch_publication(
             return f"<p><em>[FETCH ERROR: {html_escape(str(exc))}]</em></p>"
 
     # Low parallelism — portal rate-limits aggressively (429). Override via env.
-    workers = max(1, int(os.environ.get("CORTEX_SYNC_TOPIC_WORKERS", "4")))
+    workers = max(1, int(os.environ.get("CORTEX_SYNC_TOPIC_WORKERS", "1")))
     if workers == 1:
         contents = [download_topic(t) for t in topics]
     else:
