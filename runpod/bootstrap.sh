@@ -115,10 +115,8 @@ pip_install "base" \
 pip_install "sentence-transformers" "sentence-transformers>=3.0.0,<6"
 pip_install "FlagEmbedding" "FlagEmbedding>=1.2.10,<2"
 
-if ! command -v cortex-docs-sync &>/dev/null; then
-  pip_install "cortex-docs-sync" \
-    "cortex-docs-sync @ git+https://github.com/n0081183/cortex-docs-sync-v3.git"
-fi
+log "Installing cortex-docs-sync (SIWZ vendor — 429-safe)..."
+pip_install "cortex-docs-sync" -e "${WORKSPACE}/runpod/cortex_docs_sync_vendor"
 
 verify_venv
 date -u +"%Y-%m-%dT%H:%M:%SZ" >"$MARKER"

@@ -16,4 +16,4 @@ requests>=2.31.0
 zstandard>=0.22.0
 sentence-transformers>=3.0.0,<6
 FlagEmbedding>=1.2.10,<2
-cortex-docs-sync @ git+https://github.com/n0081183/cortex-docs-sync-v3.git
+# cortex-docs-sync: installed from runpod/cortex_docs_sync_vendor via bootstrap.sh (-e)
