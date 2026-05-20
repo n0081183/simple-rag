@@ -2,8 +2,8 @@ import type { TranslationKeys } from "./en";
 
 export const pl: TranslationKeys = {
   app: {
-    name: "SIWZ-RAG Lite",
-    tagline: "Weryfikacja wymagań Cortex",
+    name: "Cortex Workbench",
+    tagline: "Sync dokumentacji SOC i weryfikacja wymagań",
   },
   nav: {
     verify: "Weryfikacja wymagań",
@@ -55,16 +55,17 @@ export const pl: TranslationKeys = {
     stepDownload: "Pobieranie dokumentacji",
     rateLimit: "Limit żądań (req/s)",
     rateLimitHint:
-      "Portal Cortex ogranicza boty (HTTP 429). Wyższy limit = szybciej, ale większe ryzyko przerwania sync.",
-    ratePresetSafe: "Bezpieczny (0,25)",
-    ratePresetDefault: "Domyślny (0,35)",
-    ratePresetFast: "Szybki (0,6)",
-    ratePresetAggressive: "Agresywny (1,0) — ryzyko 429",
+      "Limit dotyczy jednego wątku pobierania. Efektywna prędkość ≈ req/s × workers (np. 2 × 4 ≈ 8 req/s). Przy 429 uruchom ponownie sync przyrostowy.",
+    ratePresetSafe: "Bezpieczny (0,5 × 2)",
+    ratePresetDefault: "Zbalansowany (1,0 × 4)",
+    ratePresetFast: "Szybki (2,0 × 4)",
+    ratePresetAggressive: "Max (2,0 × 8)",
     topicWorkers: "Równoległe tematy na publikację",
     topicWorkersHint: "Więcej niż 1 przyspiesza duże podręczniki, ale zwiększa szanse na 429.",
     rateWarningHigh: "Przy tym limicie często występują błędy 429 — rozważ 0,25–0,35.",
     rateWarningWorkers: "Więcej niż 1 worker zwykle wymaga niższego limitu req/s.",
-    estHint: "Pełna przebudowa ~230 publikacji: przy 0,35 req/s licz godziny, nie minuty.",
+    estHint: "Pełna przebudowa ~230 publ.: przy 1,0×4 (~4 req/s) duże podręczniki nadal trwają godzinami.",
+    aggregateRate: "Efektywna przepustowość",
   },
   settings: {
     title: "Ustawienia",

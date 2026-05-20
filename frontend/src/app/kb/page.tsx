@@ -8,22 +8,24 @@ import {
   Gauge,
   Loader2,
   XCircle,
+  Zap,
 } from "lucide-react";
+import { CortexLogo } from "@/components/brand/logo";
 import { useAppStore } from "@/stores/app-store";
 import { t } from "@/i18n";
 import { API_BASE, cn } from "@/lib/utils";
 
 const PRODUCTS = ["xdr", "xsiam", "xsoar", "xpanse", "cortex_cloud", "agentix"];
 
-const RATE_PRESETS = [
-  { key: "safe", value: 0.25 },
-  { key: "default", value: 0.35 },
-  { key: "fast", value: 0.6 },
-  { key: "aggressive", value: 1.0 },
+const SYNC_PRESETS = [
+  { key: "safe", rate: 0.5, workers: 2 },
+  { key: "default", rate: 1.0, workers: 4 },
+  { key: "fast", rate: 2.0, workers: 4 },
+  { key: "aggressive", rate: 2.0, workers: 8 },
 ] as const;
 
-const STORAGE_RATE = "siwz_kb_rate_limit";
-const STORAGE_WORKERS = "siwz_kb_topic_workers";
+const STORAGE_RATE = "cortex_workbench_kb_rate";
+const STORAGE_WORKERS = "cortex_workbench_kb_workers";
 
 const STEPS = [
   "bootstrap",
@@ -46,7 +48,7 @@ function StepIcon({ state }: { state: StepState }) {
   return <Circle className="h-4 w-4 text-muted-foreground" />;
 }
 
-function presetLabel(locale: string, key: (typeof RATE_PRESETS)[number]["key"]) {
+function presetLabel(locale: string, key: (typeof SYNC_PRESETS)[number]["key"]) {
   const map = {
     safe: "kb.ratePresetSafe",
     default: "kb.ratePresetDefault",
@@ -70,8 +72,8 @@ export default function KbPage() {
   const [incremental, setIncremental] = useState(true);
   const [dryRun, setDryRun] = useState(false);
   const [releaseNotes, setReleaseNotes] = useState(false);
-  const [rateLimit, setRateLimit] = useState(0.35);
-  const [topicWorkers, setTopicWorkers] = useState(1);
+  const [rateLimit, setRateLimit] = useState(1.0);
+  const [topicWorkers, setTopicWorkers] = useState(4);
   const [gpuInfo, setGpuInfo] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
@@ -84,7 +86,7 @@ export default function KbPage() {
     }
     if (savedWorkers) {
       const w = parseInt(savedWorkers, 10);
-      if (!Number.isNaN(w) && w >= 1 && w <= 4) setTopicWorkers(w);
+      if (!Number.isNaN(w) && w >= 1 && w <= 8) setTopicWorkers(w);
     }
   }, []);
 
@@ -93,8 +95,9 @@ export default function KbPage() {
     localStorage.setItem(STORAGE_WORKERS, String(topicWorkers));
   }, [rateLimit, topicWorkers]);
 
-  const rateHigh = rateLimit > 0.5;
-  const workersHigh = topicWorkers > 1;
+  const aggregateRps = rateLimit * topicWorkers;
+  const rateHigh = rateLimit >= 1.5;
+  const workersHigh = topicWorkers > 4;
 
   const refreshKb = useCallback(() => {
     fetch(`${API_BASE}/api/kb/status`)
@@ -194,11 +197,14 @@ export default function KbPage() {
 
   return (
     <div className="space-y-8">
-      <header className="border-l-4 border-soc pl-4">
+      <header className="border-l-4 border-soc pl-4 flex gap-4 items-start">
+        <CortexLogo size={48} className="hidden sm:block" />
+        <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           {t(locale, "kb.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground max-w-2xl">{t(locale, "kb.subtitle")}</p>
+        </div>
       </header>
 
       {!kbLoaded && (
@@ -318,23 +324,35 @@ export default function KbPage() {
         <p className="text-xs text-muted-foreground italic">{t(locale, "kb.estHint")}</p>
 
         <div className="flex flex-wrap gap-2">
-          {RATE_PRESETS.map(({ key, value }) => (
-            <button
-              key={key}
-              type="button"
-              disabled={syncing}
-              onClick={() => setRateLimit(value)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-medium border transition-colors",
-                Math.abs(rateLimit - value) < 0.01
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border text-muted-foreground hover:border-soc hover:text-foreground"
-              )}
-            >
-              {presetLabel(locale, key)}
-            </button>
-          ))}
+          {SYNC_PRESETS.map(({ key, rate, workers }) => {
+            const active =
+              Math.abs(rateLimit - rate) < 0.01 && topicWorkers === workers;
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={syncing}
+                onClick={() => {
+                  setRateLimit(rate);
+                  setTopicWorkers(workers);
+                }}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-medium border transition-colors inline-flex items-center gap-1",
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:border-soc hover:text-foreground"
+                )}
+              >
+                {key === "aggressive" && <Zap className="h-3 w-3" />}
+                {presetLabel(locale, key)}
+              </button>
+            );
+          })}
         </div>
+
+        <p className="text-sm font-mono text-soc-cyan">
+          {t(locale, "kb.aggregateRate")}: ≈ {aggregateRps.toFixed(1)} req/s
+        </p>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block space-y-2">
@@ -345,7 +363,7 @@ export default function KbPage() {
             <input
               type="range"
               min={0.1}
-              max={2}
+              max={4}
               step={0.05}
               value={rateLimit}
               onChange={(e) => setRateLimit(parseFloat(e.target.value))}
@@ -362,7 +380,7 @@ export default function KbPage() {
             <input
               type="range"
               min={1}
-              max={4}
+              max={8}
               step={1}
               value={topicWorkers}
               onChange={(e) => setTopicWorkers(parseInt(e.target.value, 10))}

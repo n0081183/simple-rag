@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Download, Upload } from "lucide-react";
+import { CortexLogo } from "@/components/brand/logo";
 import { useAppStore } from "@/stores/app-store";
 import { t } from "@/i18n";
 import { cn, API_BASE } from "@/lib/utils";
@@ -171,9 +172,12 @@ export default function VerifyPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{t(locale, "verify.title")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground max-w-2xl">{t(locale, "verify.subtitle")}</p>
+      <header className="flex gap-4 items-start border-l-4 border-soc pl-4">
+        <CortexLogo size={44} className="hidden sm:block" />
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{t(locale, "verify.title")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground max-w-2xl">{t(locale, "verify.subtitle")}</p>
+        </div>
       </header>
 
       {showAutoDetectWarning && (

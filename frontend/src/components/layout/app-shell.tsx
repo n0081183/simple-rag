@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useAppStore, type ThemeMode } from "@/stores/app-store";
 import { t, type Locale } from "@/i18n";
+import { CortexLogo } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -41,11 +42,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen bg-background text-foreground">
         <aside className="flex w-56 shrink-0 flex-col border-r border-[hsl(var(--soc)/0.25)] bg-sidebar text-sidebar-foreground">
           <div className="border-b border-[hsl(var(--soc)/0.2)] px-4 py-4">
-            <div className="text-sm font-semibold tracking-tight text-[hsl(var(--soc))]">
-              {t(locale, "app.name")}
-            </div>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              {t(locale, "app.tagline")}
+            <div className="flex items-center gap-2.5">
+              <CortexLogo size={36} />
+              <div>
+                <div className="text-sm font-semibold tracking-tight text-[hsl(var(--soc))]">
+                  {t(locale, "app.name")}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {t(locale, "app.tagline")}
+                </div>
+              </div>
             </div>
           </div>
           <nav className="flex-1 space-y-0.5 p-3">

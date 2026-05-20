@@ -114,8 +114,14 @@ def _build_main_parser(snapshot: CatalogSnapshot) -> argparse.ArgumentParser:
     p.add_argument(
         "--rate-limit",
         type=float,
-        default=0.35,
-        help="Max HTTP requests per second (default 0.35 — portal rate-limits bots)",
+        default=1.0,
+        help="HTTP req/s per download thread (aggregate ≈ rate × topic-workers)",
+    )
+    p.add_argument(
+        "--topic-workers",
+        type=int,
+        default=4,
+        help="Parallel topic downloads per publication (default 4)",
     )
     p.add_argument(
         "--allow-partial-failures",
@@ -258,7 +264,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"  Labels matched:      {selected_labels}")
     print(f"  Mode:                {'FULL re-fetch' if args.full else 'incremental'}")
     print(f"  Dry-run:             {args.dry_run}")
-    print(f"  Rate limit:          {args.rate_limit} req/s")
+    print(f"  Rate limit:          {args.rate_limit} req/s per thread")
+    print(f"  Topic workers:       {args.topic_workers}")
+    print(
+        f"  Aggregate (~):       {args.rate_limit * args.topic_workers:.1f} req/s"
+    )
     print(f"  Output dir:          {args.output_dir}")
     print(f"  State file:          {state_file}")
     print(f"  Excluded categories: {default_excludes}")
@@ -272,6 +282,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         pub_filter=pub_filter,
         product_dir_map=product_dir_map,
         rate_limit_rps=args.rate_limit,
+        topic_workers=args.topic_workers,
         user_agent=args.user_agent,
         full_refetch=args.full,
         dry_run=args.dry_run,

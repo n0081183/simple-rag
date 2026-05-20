@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("SIWZ-RAG Lite smoke", () => {
   test("home page loads with app title", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("SIWZ-RAG Lite")).toBeVisible();
+    await expect(page.getByText("Cortex Workbench")).toBeVisible();
     await expect(page.getByTestId("verify-textarea")).toBeVisible();
   });
 

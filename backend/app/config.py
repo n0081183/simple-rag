@@ -19,7 +19,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "SIWZ-RAG Lite"
+    app_name: str = "Cortex Workbench"
     debug: bool = False
     data_dir: Path = Field(default_factory=lambda: _expand_home("~/.siwz-rag-lite"))
     log_level: str = "INFO"

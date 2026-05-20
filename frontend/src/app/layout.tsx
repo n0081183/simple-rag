@@ -14,8 +14,8 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SIWZ-RAG Lite",
-  description: "Cortex SIWZ/RFP requirement verification",
+  title: "Cortex Workbench",
+  description: "Cortex documentation sync and SIWZ/RFP requirement verification",
 };
 
 export default function RootLayout({
