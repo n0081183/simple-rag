@@ -4,40 +4,48 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --background: 210 30% 97%;
+    --foreground: 220 25% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --border: 214 32% 91%;
-    --primary: 222 47% 18%;
-    --primary-foreground: 210 40% 98%;
-    --accent: 210 40% 94%;
-    --accent-foreground: 222 47% 11%;
+    --card-foreground: 220 25% 12%;
+    --muted: 210 25% 93%;
+    --muted-foreground: 220 12% 42%;
+    --border: 158 22% 82%;
+    --primary: 158 64% 32%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 187 72% 38%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --sidebar: 210 40% 97%;
-    --sidebar-foreground: 222 47% 11%;
+    --sidebar: 220 22% 96%;
+    --sidebar-foreground: 220 25% 14%;
+    --soc: 158 64% 32%;
+    --soc-muted: 158 30% 90%;
+    --soc-cyan: 187 72% 38%;
+    --warning: 38 92% 50%;
     --radius: 0.375rem;
   }
 
   .dark {
-    --background: 240 6% 6%;
-    --foreground: 210 40% 96%;
-    --card: 240 5% 8%;
-    --card-foreground: 210 40% 96%;
-    --muted: 240 4% 14%;
-    --muted-foreground: 240 5% 65%;
-    --border: 240 4% 16%;
-    --primary: 210 40% 96%;
-    --primary-foreground: 240 6% 6%;
-    --accent: 240 4% 14%;
-    --accent-foreground: 210 40% 96%;
+    --background: 222 22% 7%;
+    --foreground: 210 25% 92%;
+    --card: 222 20% 10%;
+    --card-foreground: 210 25% 92%;
+    --muted: 222 16% 16%;
+    --muted-foreground: 215 14% 58%;
+    --border: 158 28% 22%;
+    --primary: 152 76% 42%;
+    --primary-foreground: 222 22% 7%;
+    --accent: 187 85% 48%;
+    --accent-foreground: 222 22% 7%;
     --destructive: 0 63% 45%;
     --destructive-foreground: 0 0% 100%;
-    --sidebar: 240 6% 5%;
-    --sidebar-foreground: 210 40% 96%;
+    --sidebar: 222 24% 6%;
+    --sidebar-foreground: 158 40% 88%;
+    --soc: 152 76% 42%;
+    --soc-muted: 158 35% 14%;
+    --soc-cyan: 187 85% 48%;
+    --warning: 38 92% 55%;
   }
 
   * {
@@ -46,5 +54,17 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .soc-panel {
+    @apply rounded-lg border border-[hsl(var(--soc)/0.35)] bg-card shadow-sm;
+  }
+  .soc-panel-accent {
+    @apply rounded-lg border border-[hsl(var(--soc-cyan)/0.4)] bg-[hsl(var(--soc-muted)/0.5)];
+  }
+  .soc-glow {
+    box-shadow: 0 0 0 1px hsl(var(--soc) / 0.15), 0 4px 24px -4px hsl(var(--soc) / 0.2);
   }
 }

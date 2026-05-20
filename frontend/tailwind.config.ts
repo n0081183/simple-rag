@@ -41,6 +41,12 @@ const config: Config = {
           DEFAULT: "hsl(var(--sidebar))",
           foreground: "hsl(var(--sidebar-foreground))",
         },
+        soc: {
+          DEFAULT: "hsl(var(--soc))",
+          muted: "hsl(var(--soc-muted))",
+          cyan: "hsl(var(--soc-cyan))",
+        },
+        warning: "hsl(var(--warning))",
       },
       borderRadius: {
         lg: "var(--radius)",
