@@ -67,6 +67,17 @@ print("ok:", torch.cuda.get_device_name(0))
 PY
 }
 
+verify_cortex_docs_sync() {
+  # shellcheck disable=SC1091
+  source "$VENV/bin/activate"
+  python - <<'PY'
+import cortex_docs_sync.client as c
+assert hasattr(c, "MAX_BACKOFF_SECONDS"), "cortex-docs-sync is not the SIWZ vendor build"
+assert c.CortexDocsClient(max_retries=8).max_retries == 8
+print("cortex-docs-sync:", c.__file__)
+PY
+}
+
 log "Checking CUDA..."
 if ! command -v nvidia-smi &>/dev/null; then
   log "ERROR: nvidia-smi not found"
@@ -75,12 +86,12 @@ fi
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 
 if [[ -f "$MARKER" && -z "${FORCE_BOOTSTRAP:-}" ]]; then
-  log "Marker present — verifying existing venv..."
-  if verify_venv; then
-    log "Already configured (set FORCE_BOOTSTRAP=1 to reinstall)"
+  log "Marker present — refreshing SIWZ cortex-docs-sync + quick verify..."
+  if [[ -x "$VENV/bin/python" ]] && verify_venv && verify_cortex_docs_sync 2>/dev/null; then
+    log "Already configured (set FORCE_BOOTSTRAP=1 to reinstall all deps)"
     exit 0
   fi
-  log "Marker stale, reinstalling..."
+  log "Marker stale or wrong docs-sync package — full reinstall..."
   rm -f "$MARKER"
 fi
 
@@ -116,8 +127,10 @@ pip_install "sentence-transformers" "sentence-transformers>=3.0.0,<6"
 pip_install "FlagEmbedding" "FlagEmbedding>=1.2.10,<2"
 
 log "Installing cortex-docs-sync (SIWZ vendor — 429-safe)..."
+"$VENV/bin/pip" uninstall -y cortex-docs-sync 2>/dev/null || true
 pip_install "cortex-docs-sync" -e "${WORKSPACE}/runpod/cortex_docs_sync_vendor"
 
 verify_venv
+verify_cortex_docs_sync
 date -u +"%Y-%m-%dT%H:%M:%SZ" >"$MARKER"
 log "Done. Pip log: ${LOG}"

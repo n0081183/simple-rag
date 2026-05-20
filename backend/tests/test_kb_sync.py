@@ -1,5 +1,21 @@
 from app.api.kb import SyncStartRequest
-from app.jobs.kb_sync import run_kb_sync_job
+from app.jobs.kb_sync import _pipeline_failure_message, run_kb_sync_job
+
+
+def test_pipeline_failure_message_uses_stdout_when_stderr_empty():
+    msg = _pipeline_failure_message(
+        1,
+        out="Done: 132 fetched\nFailed: 1\n  - Cortex XSOAR Multi-Tenant Guide",
+        err="",
+        recent_log=[],
+    )
+    assert "exit 1" in msg
+    assert "Multi-Tenant Guide" in msg
+
+
+def test_pipeline_failure_message_falls_back_to_recent_log():
+    msg = _pipeline_failure_message(1, "", "", ["line1", "FAILED: pipeline failed"])
+    assert "FAILED: pipeline failed" in msg
 
 
 def test_kb_sync_dry_run():

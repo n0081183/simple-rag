@@ -114,8 +114,19 @@ def _build_main_parser(snapshot: CatalogSnapshot) -> argparse.ArgumentParser:
     p.add_argument(
         "--rate-limit",
         type=float,
-        default=0.5,
-        help="Max HTTP requests per second (default 0.5 — portal rate-limits bots)",
+        default=0.35,
+        help="Max HTTP requests per second (default 0.35 — portal rate-limits bots)",
+    )
+    p.add_argument(
+        "--allow-partial-failures",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Exit 0 when at least one publication fetched (default: true)",
+    )
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit 1 if any publication failed",
     )
     p.add_argument(
         "--include-release-notes", action="store_true",
@@ -284,6 +295,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"    - {title}")
     print(f"  Elapsed:             {stats.elapsed_seconds:.1f}s")
 
+    if args.strict or not args.allow_partial_failures:
+        return 0 if stats.failed == 0 else 1
+    if stats.fetched > 0:
+        if stats.failed:
+            logger.warning(
+                "Partial sync: %d failed, %d fetched — continuing (use --strict to fail)",
+                stats.failed,
+                stats.fetched,
+            )
+        return 0
     return 0 if stats.failed == 0 else 1
 
 

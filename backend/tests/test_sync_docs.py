@@ -1,9 +1,23 @@
 import argparse
+import os
 import sys
 from unittest.mock import patch
 
 from runpod.pipeline import sync_docs
 from runpod.pipeline.sync_docs import build_sync_cmd
+
+
+def _sync_args(**overrides):
+    defaults = dict(
+        output_dir="/workspace/cortex_docs",
+        rate_limit=0.35,
+        user_agent="test-ua",
+        products=["xdr"],
+        full=False,
+        include_release_notes=False,
+    )
+    defaults.update(overrides)
+    return argparse.Namespace(**defaults)
 
 
 def test_build_sync_cmd_all_products():
@@ -16,6 +30,7 @@ def test_build_sync_cmd_all_products():
         include_release_notes=False,
     )
     cmd = build_sync_cmd(args)
+    assert "--allow-partial-failures" in cmd
     idx = cmd.index("--product")
     assert cmd[idx + 1 : idx + 7] == [
         "xdr",
@@ -65,6 +80,15 @@ def test_sync_docs_cli_parses_run_all_style_argv():
             with patch.object(sys, "exit"):
                 sync_docs.main()
     call_cmd = mock_sp.call.call_args[0][0]
+    assert "--allow-partial-failures" in call_cmd
     assert call_cmd.count("--product") == 1
-    products = call_cmd[call_cmd.index("--product") + 1 :]
+    i = call_cmd.index("--product") + 1
+    products = call_cmd[i : i + 6]
     assert products == ["xdr", "xsiam", "xsoar", "xpanse", "cortex_cloud", "agentix"]
+
+
+def test_build_sync_cmd_strict_when_partial_disabled(monkeypatch):
+    monkeypatch.setenv("CORTEX_ALLOW_PARTIAL", "0")
+    cmd = build_sync_cmd(_sync_args())
+    assert "--strict" in cmd
+    assert "--allow-partial-failures" not in cmd

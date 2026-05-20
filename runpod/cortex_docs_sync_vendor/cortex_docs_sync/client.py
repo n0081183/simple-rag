@@ -20,8 +20,8 @@ DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (compatible; SIWZ-RAG-Lite/1.0; +https://github.com/n0081183/simple-rag) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
-DEFAULT_RATE_LIMIT_RPS = 0.5
-MAX_BACKOFF_SECONDS = 120.0
+DEFAULT_RATE_LIMIT_RPS = 0.35
+MAX_BACKOFF_SECONDS = 180.0
 
 logger = logging.getLogger(__name__)
 
@@ -64,17 +64,8 @@ class CortexDocsClient:
                 "Accept-Language": "en-US,en;q=0.9",
             }
         )
-        # Do NOT auto-retry 429 at urllib3 layer — it causes "too many 429" bursts.
-        retries = Retry(
-            total=2,
-            connect=2,
-            read=2,
-            backoff_factor=1.0,
-            status_forcelist=[500, 502, 503, 504],
-            allowed_methods=["GET"],
-            raise_on_status=False,
-        )
-        adapter = HTTPAdapter(pool_connections=8, pool_maxsize=8, max_retries=retries)
+        # All retries live in _get() — urllib3 must not retry 429 (causes retry storms).
+        adapter = HTTPAdapter(pool_connections=4, pool_maxsize=4, max_retries=Retry(total=0))
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 
@@ -101,7 +92,25 @@ class CortexDocsClient:
         for attempt in range(1, self.max_retries + 1):
             self.rate_limiter.wait()
             try:
-                resp = self.session.get(url, params=params, timeout=self.timeout)
+                try:
+                    resp = self.session.get(url, params=params, timeout=self.timeout)
+                except requests.exceptions.RetryError as exc:
+                    last_exc = exc
+                    backoff = min(MAX_BACKOFF_SECONDS, 30.0 * attempt)
+                    logger.warning(
+                        "GET %s urllib3 retry limit (attempt %d/%d) — sleeping %.1fs",
+                        path,
+                        attempt,
+                        self.max_retries,
+                        backoff,
+                    )
+                    if attempt >= self.max_retries:
+                        raise RuntimeError(
+                            f"GET {path} failed after {self.max_retries} attempts"
+                        ) from exc
+                    time.sleep(backoff)
+                    continue
+
                 last_resp = resp
 
                 if resp.status_code == 429:

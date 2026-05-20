@@ -44,3 +44,4 @@ def test_build_sync_cmd_default_rate_in_sync_docs():
     assert "--rate-limit" in cmd
     assert "0.5" in cmd
     assert "--user-agent" in cmd
+    assert "--allow-partial-failures" in cmd

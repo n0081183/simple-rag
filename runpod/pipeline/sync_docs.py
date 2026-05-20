@@ -26,6 +26,16 @@ def build_sync_cmd(args: argparse.Namespace) -> list[str]:
         cmd.append("--full")
     if args.include_release_notes:
         cmd.append("--include-release-notes")
+    strict = os.environ.get("CORTEX_SYNC_STRICT", "").lower() in ("1", "true", "yes")
+    allow_partial = os.environ.get("CORTEX_ALLOW_PARTIAL", "1").lower() not in (
+        "0",
+        "false",
+        "no",
+    )
+    if strict or not allow_partial:
+        cmd.append("--strict")
+    else:
+        cmd.append("--allow-partial-failures")
     return cmd
 
 
@@ -46,8 +56,8 @@ def main() -> None:
     p.add_argument(
         "--rate-limit",
         type=float,
-        default=float(os.environ.get("RATE_LIMIT", "0.5")),
-        help="HTTP requests per second (default 0.5)",
+        default=float(os.environ.get("RATE_LIMIT", "0.35")),
+        help="HTTP requests per second (default 0.35)",
     )
     p.add_argument(
         "--user-agent",
