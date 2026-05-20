@@ -1,7 +1,7 @@
 export const en = {
   app: {
-    name: "SIWZ-RAG Lite",
-    tagline: "Cortex requirement verification",
+    name: "Cortex Workbench",
+    tagline: "SOC docs sync & requirement verification",
   },
   nav: {
     verify: "Verify requirements",
@@ -52,16 +52,17 @@ export const en = {
     stepDownload: "Documentation download",
     rateLimit: "Request rate (req/s)",
     rateLimitHint:
-      "The Cortex portal rate-limits bots (HTTP 429). Higher rates are faster but more likely to fail mid-sync.",
-    ratePresetSafe: "Safe (0.25)",
-    ratePresetDefault: "Default (0.35)",
-    ratePresetFast: "Fast (0.6)",
-    ratePresetAggressive: "Aggressive (1.0) — 429 risk",
+      "Limit is per download thread. Effective speed ≈ req/s × workers (e.g. 2 × 4 ≈ 8 req/s). HTTP 429 may still occur — use incremental re-run for misses.",
+    ratePresetSafe: "Safe (0.5 × 2)",
+    ratePresetDefault: "Balanced (1.0 × 4)",
+    ratePresetFast: "Fast (2.0 × 4)",
+    ratePresetAggressive: "Max (2.0 × 8)",
     topicWorkers: "Parallel topics per publication",
     topicWorkersHint: "Values above 1 speed up large guides but increase 429 risk.",
     rateWarningHigh: "This rate often triggers HTTP 429 — consider 0.25–0.35 instead.",
     rateWarningWorkers: "More than one worker usually needs a lower req/s limit.",
-    estHint: "Full rebuild (~230 pubs): at 0.35 req/s expect hours, not minutes.",
+    estHint: "Full rebuild (~230 pubs): at 1.0×4 (~4 req/s) still takes hours for huge guides.",
+    aggregateRate: "Effective throughput",
   },
   settings: {
     title: "Settings",

@@ -15,19 +15,20 @@ from urllib3.util.retry import Retry
 
 from cortex_docs_sync.models import CORTEX_BASE_URL, Publication
 
-# Browser-like UA reduces bot/WAF blocks vs generic script identifiers.
 DEFAULT_USER_AGENT = (
-    "Mozilla/5.0 (compatible; SIWZ-RAG-Lite/1.0; +https://github.com/n0081183/simple-rag) "
+    "Mozilla/5.0 (compatible; Cortex-Workbench/1.0; +https://github.com/n0081183/simple-rag) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
-DEFAULT_RATE_LIMIT_RPS = 0.35
-MAX_BACKOFF_SECONDS = 180.0
+DEFAULT_RATE_LIMIT_RPS = 1.0
+MAX_BACKOFF_SECONDS = 90.0
+FAST_MAX_BACKOFF_SECONDS = 30.0
 
 logger = logging.getLogger(__name__)
+_thread_local = threading.local()
 
 
 class RateLimiter:
-    """Token-bucket style spacing between requests with small jitter."""
+    """Per-thread spacing: each worker may sustain ``requests_per_second`` independently."""
 
     def __init__(self, requests_per_second: float) -> None:
         self._min_interval = 1.0 / max(float(requests_per_second), 0.05)
@@ -38,14 +39,13 @@ class RateLimiter:
         with self._lock:
             now = time.monotonic()
             if now < self._next_allowed:
-                delay = self._next_allowed - now
-                time.sleep(delay)
-            jitter = random.uniform(0.0, 0.2 * self._min_interval)
+                time.sleep(self._next_allowed - now)
+            jitter = random.uniform(0.0, 0.1 * self._min_interval)
             self._next_allowed = time.monotonic() + self._min_interval + jitter
 
 
 class CortexDocsClient:
-    """Conservative GET client for FluidTopics API (429-aware, no retry storms)."""
+    """GET client with per-thread rate limits (aggregate ≈ rate × parallel workers)."""
 
     def __init__(
         self,
@@ -53,7 +53,8 @@ class CortexDocsClient:
         user_agent: str = DEFAULT_USER_AGENT,
         rate_limit_rps: float = DEFAULT_RATE_LIMIT_RPS,
         timeout_seconds: int = 60,
-        max_retries: int = 8,
+        max_retries: int = 5,
+        fast_backoff: bool = True,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
@@ -64,25 +65,42 @@ class CortexDocsClient:
                 "Accept-Language": "en-US,en;q=0.9",
             }
         )
-        # All retries live in _get() — urllib3 must not retry 429 (causes retry storms).
-        adapter = HTTPAdapter(pool_connections=4, pool_maxsize=4, max_retries=Retry(total=0))
+        retries = Retry(
+            total=2,
+            connect=2,
+            read=2,
+            backoff_factor=0.5,
+            status_forcelist=[500, 502, 503, 504],
+            allowed_methods=["GET"],
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(pool_connections=16, pool_maxsize=16, max_retries=retries)
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 
-        self.rate_limiter = RateLimiter(rate_limit_rps)
+        self._rate_limit_rps = max(float(rate_limit_rps), 0.05)
         self.timeout = timeout_seconds
         self.max_retries = max_retries
+        self._fast_backoff = fast_backoff
+        self._max_backoff = FAST_MAX_BACKOFF_SECONDS if fast_backoff else MAX_BACKOFF_SECONDS
+
+    def _limiter(self) -> RateLimiter:
+        if getattr(_thread_local, "cortex_rps", None) != self._rate_limit_rps:
+            _thread_local.cortex_rps = self._rate_limit_rps
+            _thread_local.cortex_limiter = RateLimiter(self._rate_limit_rps)
+        return _thread_local.cortex_limiter
 
     def _backoff_seconds(self, resp: requests.Response | None, attempt: int) -> float:
         if resp is not None and resp.status_code == 429:
             raw = resp.headers.get("Retry-After") or resp.headers.get("retry-after")
             if raw:
                 try:
-                    return min(MAX_BACKOFF_SECONDS, max(float(raw), 5.0))
+                    return min(self._max_backoff, max(float(raw), 2.0))
                 except ValueError:
                     pass
-            return min(MAX_BACKOFF_SECONDS, 10.0 * (2 ** (attempt - 1)) + random.uniform(0, 3))
-        return min(60.0, 2.0 ** (attempt - 1) + random.uniform(0, 1))
+            base = 5.0 if self._fast_backoff else 10.0
+            return min(self._max_backoff, base * (2 ** (attempt - 1)) + random.uniform(0, 1))
+        return min(30.0, 1.5 ** (attempt - 1) + random.uniform(0, 0.5))
 
     def _get(self, path: str, params: Optional[dict] = None) -> requests.Response:
         url = f"{self.base_url}{path}"
@@ -90,27 +108,9 @@ class CortexDocsClient:
         last_resp: requests.Response | None = None
 
         for attempt in range(1, self.max_retries + 1):
-            self.rate_limiter.wait()
+            self._limiter().wait()
             try:
-                try:
-                    resp = self.session.get(url, params=params, timeout=self.timeout)
-                except requests.exceptions.RetryError as exc:
-                    last_exc = exc
-                    backoff = min(MAX_BACKOFF_SECONDS, 30.0 * attempt)
-                    logger.warning(
-                        "GET %s urllib3 retry limit (attempt %d/%d) — sleeping %.1fs",
-                        path,
-                        attempt,
-                        self.max_retries,
-                        backoff,
-                    )
-                    if attempt >= self.max_retries:
-                        raise RuntimeError(
-                            f"GET {path} failed after {self.max_retries} attempts"
-                        ) from exc
-                    time.sleep(backoff)
-                    continue
-
+                resp = self.session.get(url, params=params, timeout=self.timeout)
                 last_resp = resp
 
                 if resp.status_code == 429:

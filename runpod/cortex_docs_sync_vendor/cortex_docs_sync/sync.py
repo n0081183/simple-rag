@@ -55,28 +55,28 @@ def fetch_publication(
     client: CortexDocsClient,
     pub: Publication,
     output_path: Path,
+    *,
+    topic_workers: int = 4,
 ) -> Tuple[int, int]:
     """Pull every topic of one publication and write the assembled HTML.
 
     Returns (topic_count, bytes_written).
     """
     topics = None
-    for pub_attempt in range(1, 4):
+    for pub_attempt in range(1, 3):
         try:
             topics = client.get_topics(pub.map_id)
             break
         except Exception as exc:
-            if pub_attempt >= 3:
+            if pub_attempt >= 2:
                 raise
-            cooldown = 30 * pub_attempt
             logger.warning(
-                "get_topics failed for %s (attempt %d/3): %s — cooldown %ds",
+                "get_topics failed for %s (attempt %d/2): %s — retry in 5s",
                 pub.title,
                 pub_attempt,
                 exc,
-                cooldown,
             )
-            time.sleep(cooldown)
+            time.sleep(5)
     if not topics:
         logger.warning("Publication %s (%s) has no topics — skipping", pub.title, pub.map_id)
         return (0, 0)
@@ -92,8 +92,7 @@ def fetch_publication(
             )
             return f"<p><em>[FETCH ERROR: {html_escape(str(exc))}]</em></p>"
 
-    # Low parallelism — portal rate-limits aggressively (429). Override via env.
-    workers = max(1, int(os.environ.get("CORTEX_SYNC_TOPIC_WORKERS", "1")))
+    workers = max(1, topic_workers)
     if workers == 1:
         contents = [download_topic(t) for t in topics]
     else:
@@ -117,6 +116,7 @@ def run_sync(
     full_refetch: bool = False,
     dry_run: bool = False,
     max_publications: Optional[int] = None,
+    topic_workers: int = 4,
     progress_callback: Optional[ProgressCallback] = None,
     base_url: Optional[str] = None,
     # catalog is injected by the caller — avoids a second network round-trip
@@ -134,13 +134,22 @@ def run_sync(
     started = time.monotonic()
     stats = IngestStats()
 
+    workers = max(1, int(os.environ.get("CORTEX_SYNC_TOPIC_WORKERS", str(topic_workers))))
     client_kwargs: Dict = {
         "user_agent": user_agent,
         "rate_limit_rps": rate_limit_rps,
+        "fast_backoff": rate_limit_rps >= 0.8,
     }
     if base_url is not None:
         client_kwargs["base_url"] = base_url
     client = CortexDocsClient(**client_kwargs)
+    agg_rps = rate_limit_rps * workers
+    logger.info(
+        "Download throttle: %.2f req/s per thread × %d workers ≈ %.1f req/s aggregate",
+        rate_limit_rps,
+        workers,
+        agg_rps,
+    )
 
     state = IncrementalState(state_file)
     state.load()
@@ -205,7 +214,9 @@ def run_sync(
             except Exception:
                 logger.debug("progress_callback raised", exc_info=True)
         try:
-            topic_count, bytes_written = fetch_publication(client, pub, out_path)
+            topic_count, bytes_written = fetch_publication(
+                client, pub, out_path, topic_workers=workers
+            )
             stats.fetched += 1
             stats.topics_total += topic_count
             stats.bytes_written += bytes_written

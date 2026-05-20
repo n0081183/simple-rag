@@ -17,6 +17,8 @@ def build_sync_cmd(args: argparse.Namespace) -> list[str]:
         args.output_dir,
         "--rate-limit",
         str(args.rate_limit),
+        "--topic-workers",
+        str(args.topic_workers),
         "--user-agent",
         args.user_agent,
     ]
@@ -56,14 +58,20 @@ def main() -> None:
     p.add_argument(
         "--rate-limit",
         type=float,
-        default=float(os.environ.get("RATE_LIMIT", "0.35")),
-        help="HTTP requests per second (default 0.35)",
+        default=float(os.environ.get("RATE_LIMIT", "1.0")),
+        help="HTTP req/s per thread (default 1.0)",
+    )
+    p.add_argument(
+        "--topic-workers",
+        type=int,
+        default=int(os.environ.get("CORTEX_SYNC_TOPIC_WORKERS", "4")),
+        help="Parallel topic workers per publication",
     )
     p.add_argument(
         "--user-agent",
         default=os.environ.get(
             "CORTEX_DOCS_USER_AGENT",
-            "Mozilla/5.0 (compatible; SIWZ-RAG-Lite/1.0) "
+            "Mozilla/5.0 (compatible; Cortex-Workbench/1.0) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         ),
     )

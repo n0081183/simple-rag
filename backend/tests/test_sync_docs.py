@@ -10,7 +10,8 @@ from runpod.pipeline.sync_docs import build_sync_cmd
 def _sync_args(**overrides):
     defaults = dict(
         output_dir="/workspace/cortex_docs",
-        rate_limit=0.35,
+        rate_limit=1.0,
+        topic_workers=4,
         user_agent="test-ua",
         products=["xdr"],
         full=False,
@@ -24,6 +25,7 @@ def test_build_sync_cmd_all_products():
     args = argparse.Namespace(
         output_dir="/workspace/cortex_docs",
         rate_limit=2.0,
+        topic_workers=4,
         user_agent="test-ua",
         products=["xdr", "xsiam", "xsoar", "xpanse", "cortex_cloud", "agentix"],
         full=False,
@@ -31,6 +33,7 @@ def test_build_sync_cmd_all_products():
     )
     cmd = build_sync_cmd(args)
     assert "--allow-partial-failures" in cmd
+    assert "--topic-workers" in cmd
     idx = cmd.index("--product")
     assert cmd[idx + 1 : idx + 7] == [
         "xdr",
@@ -47,6 +50,7 @@ def test_build_sync_cmd_append_products_from_shell():
     args = argparse.Namespace(
         output_dir="/out",
         rate_limit=1.0,
+        topic_workers=4,
         user_agent="test-ua",
         products=["xdr", "xsiam", "xsoar", "xpanse", "cortex_cloud", "agentix"],
         full=True,

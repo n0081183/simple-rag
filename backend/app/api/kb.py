@@ -41,16 +41,16 @@ class SyncStartRequest(BaseModel):
     include_release_notes: bool = False
     dry_run: bool = False
     rate_limit_rps: float = Field(
-        default=0.35,
+        default=1.0,
         ge=0.1,
-        le=2.0,
-        description="HTTP requests per second when fetching Cortex docs (portal rate-limits bots)",
+        le=4.0,
+        description="HTTP req/s per download thread (aggregate ≈ rate × topic_workers)",
     )
     topic_workers: int = Field(
-        default=1,
+        default=4,
         ge=1,
-        le=4,
-        description="Parallel topic downloads per publication (higher = faster but more 429s)",
+        le=8,
+        description="Parallel topic downloads per publication",
     )
 
 

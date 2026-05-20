@@ -1,4 +1,4 @@
-# SIWZ-RAG Lite
+# Cortex Workbench
 
 Narzędzie do weryfikacji wymagań SIWZ/SWZ i budowy bazy wiedzy z dokumentacji **Palo Alto Cortex** (XDR, XSIAM, XSOAR, XPANSE, Cortex Cloud, AgentiX).
 

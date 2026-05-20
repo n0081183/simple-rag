@@ -7,11 +7,12 @@ import logging
 
 import keyring
 
-SERVICE_NAME = "siwz-rag-lite"
+# Primary service name; legacy entries remain readable after rebrand.
+SERVICE_NAME = "cortex-workbench"
+LEGACY_SERVICE_NAMES = ("siwz-rag-lite",)
 
 logger = logging.getLogger(__name__)
 
-# Headless CI / Linux without dbus-secret: in-memory fallback (never persisted to disk)
 _memory_store: dict[str, str] = {}
 
 
@@ -30,6 +31,11 @@ def set_secret(name: str, value: str) -> None:
 def get_secret(name: str) -> str | None:
     try:
         value = keyring.get_password(SERVICE_NAME, name)
+        if not value:
+            for legacy in LEGACY_SERVICE_NAMES:
+                value = keyring.get_password(legacy, name)
+                if value:
+                    break
     except keyring.errors.NoKeyringError:
         value = _memory_store.get(name)
     if value:
@@ -44,6 +50,11 @@ def delete_secret(name: str) -> None:
         pass
     except keyring.errors.NoKeyringError:
         _memory_store.pop(name, None)
+    for legacy in LEGACY_SERVICE_NAMES:
+        try:
+            keyring.delete_password(legacy, name)
+        except (keyring.errors.PasswordDeleteError, keyring.errors.NoKeyringError):
+            pass
 
 
 def has_secret(name: str) -> bool:

@@ -21,7 +21,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="SIWZ-RAG Lite",
+    title="Cortex Workbench",
     version=__version__,
     lifespan=lifespan,
 )

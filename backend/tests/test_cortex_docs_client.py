@@ -35,6 +35,7 @@ def test_build_sync_cmd_default_rate_in_sync_docs():
     args = argparse.Namespace(
         output_dir="/tmp",
         rate_limit=0.5,
+        topic_workers=4,
         user_agent="test-ua",
         products=["xdr"],
         full=False,
