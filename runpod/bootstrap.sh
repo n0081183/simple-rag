@@ -24,6 +24,12 @@ pip install -q --upgrade pip wheel
 echo "[bootstrap] Installing GPU dependencies..."
 pip install -q torch --index-url https://download.pytorch.org/whl/cu124
 pip install -q -r "${WORKSPACE}/runpod/requirements.txt"
+pip install -q zstandard
+
+# cortex-docs-sync CLI
+if ! command -v cortex-docs-sync &>/dev/null; then
+  pip install -q "cortex-docs-sync @ git+https://github.com/n0081183/cortex-docs-sync-v3.git"
+fi
 
 python - <<'PY'
 import torch

@@ -128,7 +128,7 @@ def build_seed_kb(target_path: Path | None = None, skip_ml: bool = False) -> KBM
         )
 
     db = lancedb.connect(str(lance_dir))
-    if "chunks" in db.table_names():
+    if "chunks" in db.list_tables():
         db.drop_table("chunks")
     db.create_table("chunks", data=rows, mode="overwrite")
 
