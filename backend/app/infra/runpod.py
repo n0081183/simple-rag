@@ -22,6 +22,7 @@ class PodInfo:
     gpu_type: str | None
     status: str
     public_ip: str | None
+    ssh_port: int = 22
 
 
 class RunPodClient:
@@ -34,20 +35,63 @@ class RunPodClient:
         return {"Authorization": f"Bearer {self.api_key}"}
 
     def get_pod(self, pod_id: str) -> PodInfo:
-        """Fetch pod metadata via REST (simplified; full GraphQL in Milestone 2)."""
+        """Fetch pod metadata via RunPod REST API."""
         with httpx.Client(timeout=30.0) as client:
             resp = client.get(
                 f"{RUNPOD_REST}/pods/{pod_id}",
                 headers=self._headers(),
             )
+            if resp.status_code == 404:
+                return self._get_pod_graphql(pod_id)
             resp.raise_for_status()
             data = resp.json()
+        return self._parse_pod(pod_id, data)
+
+    def _get_pod_graphql(self, pod_id: str) -> PodInfo:
+        query = """
+        query Pod($input: PodQueryInput!) {
+          pod(input: $input) { id name desiredStatus
+            runtime { ports { ip isIpPublic privatePort publicPort type } }
+            machine { gpuDisplayName }
+          }
+        }
+        """
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(
+                RUNPOD_API,
+                headers={**self._headers(), "Content-Type": "application/json"},
+                json={"query": query, "variables": {"input": {"podId": pod_id}}},
+            )
+            resp.raise_for_status()
+            data = resp.json()["data"]["pod"]
+        ip, port = None, 22
+        for p in data.get("runtime", {}).get("ports", []) or []:
+            if p.get("privatePort") == 22 and p.get("isIpPublic"):
+                ip = p.get("ip")
+                port = int(p.get("publicPort") or 22)
         return PodInfo(
             pod_id=pod_id,
             name=data.get("name", pod_id),
-            gpu_type=data.get("gpuType"),
+            gpu_type=(data.get("machine") or {}).get("gpuDisplayName"),
             status=data.get("desiredStatus", "unknown"),
-            public_ip=data.get("publicIp"),
+            public_ip=ip,
+            ssh_port=port,
+        )
+
+    def _parse_pod(self, pod_id: str, data: dict) -> PodInfo:
+        ip = data.get("publicIp") or data.get("ip")
+        port = 22
+        for p in data.get("ports", []) or data.get("runtime", {}).get("ports", []) or []:
+            if p.get("privatePort") == 22:
+                ip = ip or p.get("ip")
+                port = int(p.get("publicPort") or port)
+        return PodInfo(
+            pod_id=pod_id,
+            name=data.get("name", pod_id),
+            gpu_type=data.get("gpuType") or data.get("gpuDisplayName"),
+            status=data.get("desiredStatus", "unknown"),
+            public_ip=ip,
+            ssh_port=port,
         )
 
     def stop_pod(self, pod_id: str) -> None:

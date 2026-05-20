@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.core.kb.manifest import load_manifest
 from app.core.kb.store import KnowledgeStore
 from app.config import get_settings
+from app.infra.runpod import RunPodClient
 
 router = APIRouter(prefix="/kb", tags=["knowledge-base"])
 
@@ -29,11 +30,16 @@ class KBStatusResponse(BaseModel):
 
 
 class SyncStartRequest(BaseModel):
-    products: list[str] = Field(default_factory=lambda: ["xdr", "xsiam", "xsoar", "xpanse", "cortex_cloud", "agentix"])
+    products: list[str] = Field(
+        default_factory=lambda: ["xdr", "xsiam", "xsoar", "xpanse", "cortex_cloud", "agentix"]
+    )
     incremental: bool = True
-    pod_id: str
+    pod_id: str = ""
     ssh_host: str | None = None
+    ssh_port: int = 22
+    ssh_key_path: str | None = None
     include_release_notes: bool = False
+    dry_run: bool = False
 
 
 class SyncJobResponse(BaseModel):
@@ -86,3 +92,22 @@ def get_sync_status(job_id: str):
     if not job:
         raise HTTPException(404, "Sync job not found")
     return job
+
+
+@router.post("/test-connection")
+def kb_test_connection(body: SyncStartRequest):
+    try:
+        from app.jobs.kb_sync import test_connection
+
+        return test_connection(body)
+    except Exception as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@router.post("/pods/{pod_id}/stop")
+def stop_pod(pod_id: str):
+    try:
+        RunPodClient().stop_pod(pod_id)
+        return {"ok": True, "pod_id": pod_id}
+    except Exception as e:
+        raise HTTPException(400, str(e)) from e

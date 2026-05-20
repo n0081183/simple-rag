@@ -36,8 +36,8 @@ run: build ## Production: FastAPI serves API + static frontend
 eval: ## Run gold-set evaluation pipeline
 	$(UV) run python eval/run_eval.py
 
-sync-kb: ## CLI fallback for knowledge-base sync (RunPod pipeline)
-	$(UV) run python -m app.jobs.kb_sync --help
+sync-kb: ## CLI fallback: dry-run seed KB (no RunPod)
+	cd backend && $(UV) run python -c "from app.api.kb import SyncStartRequest; from app.jobs.kb_sync import run_kb_sync_job; run_kb_sync_job('cli', SyncStartRequest(dry_run=True), {})"
 
 lint: ## Ruff + mypy + frontend lint
 	$(UV) run ruff check backend eval
