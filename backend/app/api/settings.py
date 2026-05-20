@@ -1,9 +1,9 @@
 """Application settings API (secrets via keychain handles only)."""
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.config import get_settings
+from app.config import get_settings, load_user_config, save_user_config
 from app.infra import keychain
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -14,12 +14,17 @@ class SecretSetRequest(BaseModel):
     value: str
 
 
+class LLMSettingsUpdate(BaseModel):
+    provider: str = Field(pattern="^(ollama|anthropic)$")
+
+
 class LLMSettingsResponse(BaseModel):
     provider: str
     ollama_model: str
     ollama_base_url: str
     has_anthropic_key: bool
     has_runpod_key: bool
+    has_openai_key: bool = False
 
 
 @router.get("/llm", response_model=LLMSettingsResponse)
@@ -31,7 +36,21 @@ def get_llm_settings():
         ollama_base_url=s.ollama_base_url,
         has_anthropic_key=keychain.has_secret("anthropic_api_key"),
         has_runpod_key=keychain.has_secret("runpod_api_key"),
+        has_openai_key=keychain.has_secret("openai_api_key"),
     )
+
+
+@router.patch("/llm", response_model=LLMSettingsResponse)
+def update_llm_settings(body: LLMSettingsUpdate):
+    if body.provider == "anthropic" and not keychain.has_secret("anthropic_api_key"):
+        raise HTTPException(
+            400,
+            "Anthropic API key not configured. Add it in Settings first.",
+        )
+    cfg = load_user_config()
+    cfg["llm_provider"] = body.provider
+    save_user_config(cfg)
+    return get_llm_settings()
 
 
 @router.post("/secrets")

@@ -38,7 +38,7 @@ class KnowledgeStore:
 
             self.kb_path.mkdir(parents=True, exist_ok=True)
             self._db = lancedb.connect(str(self.kb_path / "lance"))
-            if self.TABLE_NAME in self._db.table_names():
+            if self.TABLE_NAME in self._db.list_tables():
                 self._table = self._db.open_table(self.TABLE_NAME)
         except ImportError:
             self._db = None

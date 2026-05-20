@@ -9,7 +9,8 @@ from app.config import get_settings
 from app.core.extraction.presplit import pre_split_blocks
 from app.core.extraction.validator import BlockValidator
 from app.core.extraction.schemas import ExtractionJobResult, ExtractedRequirement
-from app.core.retrieval.product_match import suggest_product
+from app.core.retrieval.product_match import detect_products, suggest_product
+from app.core.extraction.schemas import ProductSuggestionOut
 
 logger = logging.getLogger(__name__)
 
@@ -41,15 +42,27 @@ class ExtractionPipeline:
                         logger.warning("block_validate_failed error=%s", e)
 
         product_suggestion = None
+        product_suggestions: list[ProductSuggestionOut] = []
         auto_warning = False
         if auto_detect and requirements:
             corpus = "\n".join(r.text for r in requirements)
+            ranked = detect_products(corpus, top_n=3)
+            product_suggestions = [
+                ProductSuggestionOut(
+                    product=s.product,
+                    score=s.score,
+                    lexical_score=s.lexical_score,
+                    semantic_score=s.semantic_score,
+                )
+                for s in ranked
+            ]
             product_suggestion, auto_warning = suggest_product(corpus)
 
         return ExtractionJobResult(
             requirements=requirements,
             blocks_processed=len(blocks),
             product_suggestion=product_suggestion,
+            product_suggestions=product_suggestions,
             auto_detect_warning=auto_warning,
             status="completed",
         )

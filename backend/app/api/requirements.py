@@ -7,13 +7,18 @@ from enum import Enum
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from app.core.extraction.parser import parse_upload_bytes
 from app.core.extraction.pipeline import ExtractionPipeline
-from app.core.extraction.schemas import ExtractedRequirement, ExtractionJobResult
+from app.core.extraction.schemas import (
+    ExtractedRequirement,
+    ProductSuggestionOut,
+)
+from app.core.reporting.docx import export_docx
 from app.core.reporting.markdown import export_markdown
+from app.core.reporting.xlsx import export_xlsx
 from app.core.verification.schemas import VerificationResult
 from app.core.verification.verifier import VerificationOrchestrator
 
@@ -46,6 +51,7 @@ class RequirementsListResponse(BaseModel):
     status: str
     requirements: list[ExtractedRequirement] = Field(default_factory=list)
     product_suggestion: str | None = None
+    product_suggestions: list[ProductSuggestionOut] = Field(default_factory=list)
     auto_detect_warning: bool = False
     blocks_processed: int = 0
     error: str | None = None
@@ -74,6 +80,7 @@ class VerifyStatusResponse(BaseModel):
 
 def _run_extraction(job_id: str, text: str, language: str, auto_detect: bool, use_llm: bool):
     _jobs[job_id]["status"] = "processing"
+    _jobs[job_id]["auto_detect_used"] = auto_detect
     try:
         pipeline = ExtractionPipeline(language=language, use_llm=use_llm)
         result = pipeline.run(text=text, auto_detect=auto_detect)
@@ -84,9 +91,20 @@ def _run_extraction(job_id: str, text: str, language: str, auto_detect: bool, us
         _jobs[job_id]["error"] = str(e)
 
 
-def _run_verification(job_id: str, reqs: list[ExtractedRequirement], body: VerifyRequest):
+def _run_verification(
+    job_id: str,
+    reqs: list[ExtractedRequirement],
+    body: VerifyRequest,
+    extract_job: dict[str, Any],
+):
     _verify_jobs[job_id]["status"] = "processing"
     _verify_jobs[job_id]["total"] = len(reqs)
+    _verify_jobs[job_id]["product"] = body.product
+    _verify_jobs[job_id]["anonymize"] = body.anonymize
+    _verify_jobs[job_id]["language"] = body.language.value
+    _verify_jobs[job_id]["product_auto_detected"] = bool(
+        extract_job.get("auto_detect_used") and extract_job.get("auto_detect_warning")
+    )
     try:
         orchestrator = VerificationOrchestrator(
             product=body.product,
@@ -152,11 +170,17 @@ def get_extraction(job_id: str):
     job = _jobs.get(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
+    suggestions = job.get("product_suggestions", [])
+    parsed_suggestions = [
+        s if isinstance(s, ProductSuggestionOut) else ProductSuggestionOut.model_validate(s)
+        for s in suggestions
+    ]
     return RequirementsListResponse(
         job_id=job_id,
         status=job.get("status", "unknown"),
         requirements=job.get("requirements", []),
         product_suggestion=job.get("product_suggestion"),
+        product_suggestions=parsed_suggestions,
         auto_detect_warning=job.get("auto_detect_warning", False),
         blocks_processed=job.get("blocks_processed", 0),
         error=job.get("error"),
@@ -186,7 +210,7 @@ async def start_verification(body: VerifyRequest, background_tasks: BackgroundTa
         raise HTTPException(400, "No requirements to verify")
     job_id = str(uuid.uuid4())
     _verify_jobs[job_id] = {"status": "queued", "results": [], "progress": 0, "total": len(reqs)}
-    background_tasks.add_task(_run_verification, job_id, reqs, body)
+    background_tasks.add_task(_run_verification, job_id, reqs, body, job)
     return ExtractResponse(job_id=job_id, status="queued")
 
 
@@ -210,22 +234,70 @@ def get_verification(job_id: str):
     )
 
 
-@router.get("/verify/{job_id}/report.md")
-def export_report_md(
-    job_id: str,
-    language: Language = Language.pl,
-    auto_detect_warning: bool = False,
-):
+def _completed_verify_job(job_id: str) -> tuple[dict[str, Any], list[VerificationResult]]:
     job = _verify_jobs.get(job_id)
     if not job or job.get("status") != "completed":
         raise HTTPException(404, "Completed verification job not found")
-    results = [
-        VerificationResult.model_validate(r) for r in job.get("results", [])
-    ]
+    results = [VerificationResult.model_validate(r) for r in job.get("results", [])]
+    return job, results
+
+
+@router.get("/verify/{job_id}/report.md")
+def export_report_md(
+    job_id: str,
+    language: Language | None = None,
+    anonymize: bool = False,
+):
+    job, results = _completed_verify_job(job_id)
+    lang = (language or Language(job.get("language", "pl"))).value
     md = export_markdown(
         results,
-        title="SIWZ Verification Report",
-        language=language.value,
-        auto_detect_warning=auto_detect_warning,
+        language=lang,
+        auto_detect_warning=job.get("product_auto_detected", False),
+        product=job.get("product"),
+        anonymize=anonymize or job.get("anonymize", False),
     )
-    return PlainTextResponse(md, media_type="text/markdown")
+    return PlainTextResponse(md, media_type="text/markdown; charset=utf-8")
+
+
+@router.get("/verify/{job_id}/report.docx")
+def export_report_docx(
+    job_id: str,
+    language: Language | None = None,
+    anonymize: bool = False,
+):
+    job, results = _completed_verify_job(job_id)
+    lang = (language or Language(job.get("language", "pl"))).value
+    data = export_docx(
+        results,
+        language=lang,
+        auto_detect_warning=job.get("product_auto_detected", False),
+        product=job.get("product"),
+        anonymize=anonymize or job.get("anonymize", False),
+    )
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="siwz-report-{job_id[:8]}.docx"'},
+    )
+
+
+@router.get("/verify/{job_id}/report.xlsx")
+def export_report_xlsx(
+    job_id: str,
+    language: Language | None = None,
+    anonymize: bool = False,
+):
+    job, results = _completed_verify_job(job_id)
+    lang = (language or Language(job.get("language", "pl"))).value
+    data = export_xlsx(
+        results,
+        language=lang,
+        product=job.get("product"),
+        anonymize=anonymize or job.get("anonymize", False),
+    )
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="siwz-report-{job_id[:8]}.xlsx"'},
+    )

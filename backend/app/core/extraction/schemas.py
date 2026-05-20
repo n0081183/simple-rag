@@ -43,10 +43,18 @@ class ExtractedRequirement(BaseModel):
     source_block_index: int | None = None
 
 
+class ProductSuggestionOut(BaseModel):
+    product: str
+    score: float
+    lexical_score: float = 0.0
+    semantic_score: float = 0.0
+
+
 class ExtractionJobResult(BaseModel):
     requirements: list[ExtractedRequirement]
     blocks_processed: int = 0
     product_suggestion: str | None = None
+    product_suggestions: list[ProductSuggestionOut] = Field(default_factory=list)
     auto_detect_warning: bool = False
     status: str = "completed"
     error: str | None = None

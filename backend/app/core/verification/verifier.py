@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from app.core.extraction.schemas import ExtractedRequirement
 from app.core.llm import get_llm_provider
+from app.core.reporting.anonymizer import anonymize_results
 from app.core.retrieval.retriever import Retriever, build_context
 from app.core.verification.prompts import build_verify_system_prompt, build_verify_user_prompt
 from app.core.verification.schemas import (
@@ -66,7 +67,7 @@ class VerificationOrchestrator:
                 ]
 
         if self.anonymize:
-            result = self._anonymize(result)
+            result = anonymize_results([result])[0]
 
         return result
 
@@ -103,16 +104,3 @@ class VerificationOrchestrator:
             caveats="Fallback verification path",
         )
 
-    def _anonymize(self, result: VerificationResult) -> VerificationResult:
-        replacements = [
-            ("Cortex XDR", "rozwiązanie"),
-            ("Cortex XSIAM", "rozwiązanie"),
-            ("Cortex XSOAR", "rozwiązanie"),
-            ("Cortex XPANSE", "rozwiązanie"),
-            ("Palo Alto", "dostawca"),
-        ]
-        text = result.requirement_text
-        for old, new in replacements:
-            text = text.replace(old, new)
-        result.requirement_text = text
-        return result

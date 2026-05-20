@@ -42,6 +42,14 @@ See [docs/architecture.md](docs/architecture.md) and [docs/decisions/](docs/deci
 
 RunPod and LLM API keys are stored in the **OS keychain** only — never in the repository.
 
+## Status
+
+- [x] M0: Skeleton, ADR, CI
+- [x] M1: LLM extraction, RAG, verification, MD report, gold set
+- [x] M2: RunPod SSH pipeline, snapshot, atomic swap
+- [x] M3: DOCX/XLSX exports, product auto-detect (top 3 + confirm), LLM toggle, report anonymization
+- [ ] M4: Playwright E2E, Tauri (optional)
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

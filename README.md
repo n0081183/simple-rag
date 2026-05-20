@@ -52,14 +52,13 @@ flowchart LR
 
 Klucze RunPod i API LLM — **wyłącznie keychain OS** (`siwz-rag-lite`), nigdy w repo.
 
-## Status (Milestone 0)
+## Status
 
-- [x] Szkielet repo, ADR, CI
-- [x] Pipeline ekstrakcji (pre-split + mock validator)
-- [x] Interfejsy RAG, weryfikacji, LanceDB
-- [x] UI Next.js (verify + KB sync mock)
-- [ ] Milestone 1: pełna ekstrakcja LLM, raporty, gold set
-- [ ] Milestone 2: RunPod SSH pipeline
+- [x] M0: Szkielet, ADR, CI
+- [x] M1: Ekstrakcja LLM, RAG, weryfikacja, raport MD, gold set 20
+- [x] M2: RunPod SSH pipeline, snapshot `.tar.zst`, atomic swap
+- [x] M3: DOCX/XLSX, auto-detect (top 3 + potwierdzenie), LLM toggle, anonimizacja raportów
+- [ ] M4: Playwright E2E, Tauri (opcjonalnie)
 
 ## Licencja
 
