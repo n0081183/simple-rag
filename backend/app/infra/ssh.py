@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import stat
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -13,6 +14,10 @@ import paramiko
 
 logger = logging.getLogger(__name__)
 
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+# tqdm / huggingface progress bars (skip in UI log stream)
+_PROGRESS_BAR = re.compile(r"(\d+%\|[\s█▏▎▍▌▋▊▉]+|it/s\]|\[A)")
+
 
 @dataclass
 class SSHConfig:
@@ -20,6 +25,64 @@ class SSHConfig:
     port: int = 22
     username: str = "root"
     private_key_path: str | None = None
+
+
+def _clean_stream_text(text: str) -> str:
+    text = _ANSI_ESCAPE.sub("", text)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return text.strip()
+
+
+def _is_ui_log_line(text: str) -> bool:
+    """Keep structured pipeline logs; drop tqdm/HF spinner one-liners."""
+    if not text:
+        return False
+    if text.startswith("["):
+        return True
+    if _PROGRESS_BAR.search(text):
+        return False
+    if "|" in text and ("it/s" in text or "█" in text):
+        return False
+    return len(text) < 240
+
+
+def _emit_log_line(text: str, lines: list[str], on_line: Callable[[str], None] | None, prefix: str) -> None:
+    cleaned = _clean_stream_text(text)
+    if not cleaned or not _is_ui_log_line(cleaned):
+        return
+    lines.append(cleaned)
+    if on_line:
+        on_line(f"{prefix}{cleaned}")
+
+
+def _read_stream(
+    stream,
+    lines: list[str],
+    on_line: Callable[[str], None] | None,
+    prefix: str = "",
+) -> None:
+    """Read PTY output; split on \\n and \\r so tqdm/HF bars become separate or filtered lines."""
+    buf = ""
+    while True:
+        chunk = stream.read(4096)
+        if not chunk:
+            break
+        if isinstance(chunk, bytes):
+            chunk = chunk.decode("utf-8", errors="replace")
+        buf += chunk
+        while True:
+            idx_n = buf.find("\n")
+            idx_r = buf.find("\r")
+            if idx_n == -1 and idx_r == -1:
+                break
+            candidates = [i for i in (idx_n, idx_r) if i >= 0]
+            idx = min(candidates)
+            seg = buf[:idx]
+            buf = buf[idx + 1 :]
+            if seg:
+                _emit_log_line(seg, lines, on_line, prefix)
+    if buf.strip():
+        _emit_log_line(buf, lines, on_line, prefix)
 
 
 class SSHSession:
@@ -76,19 +139,8 @@ class SSHSession:
         out_lines: list[str] = []
         err_lines: list[str] = []
 
-        def _read_stream(stream, lines: list[str], prefix: str = "") -> None:
-            while True:
-                line = stream.readline()
-                if not line:
-                    break
-                text = line if isinstance(line, str) else line.decode("utf-8", errors="replace")
-                text = text.rstrip("\n\r")
-                lines.append(text)
-                if on_line:
-                    on_line(f"{prefix}{text}")
-
-        _read_stream(stdout, out_lines)
-        _read_stream(stderr, err_lines, "[stderr] ")
+        _read_stream(stdout, out_lines, on_line)
+        _read_stream(stderr, err_lines, on_line, prefix="[stderr] ")
         code = stdout.channel.recv_exit_status()
         return code, "\n".join(out_lines), "\n".join(err_lines)
 
